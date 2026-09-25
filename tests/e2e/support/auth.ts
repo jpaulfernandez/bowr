@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { stack } from './stack';
+import { stack } from '../../support/stack';
 
 type MailpitSummary = { ID: string; Created: string };
 

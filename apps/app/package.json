@@ -19,6 +19,7 @@
     "@supabase/supabase-js": "2.117.1",
     "@tanstack/react-query": "5.103.2",
     "expo": "~57.0.25",
+    "expo-clipboard": "~57.0.2",
     "expo-constants": "~57.0.19",
     "expo-image": "~57.0.5",
     "expo-linking": "~57.0.11",

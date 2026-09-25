@@ -20,8 +20,8 @@ const alwaysAvailable = new Set(['/privacy', '/auth/callback']);
 const publicRoutes = new Set(['/', '/auth', '/auth/check-email']);
 const gateRoutes = new Set([GATE_ROUTE]);
 /** Top-level member destinations. Nested paths inherit their prefix. */
-const memberPrefixes = ['/wardrobe', '/more', '/settings'];
-const ownerPrefixes: string[] = [];
+const memberPrefixes = ['/wardrobe', '/more', '/settings', '/onboarding'];
+const ownerPrefixes = ['/admin'];
 
 function normalize(path: string): string {
   const withoutQuery = path.split(/[?#]/, 1)[0] ?? '/';

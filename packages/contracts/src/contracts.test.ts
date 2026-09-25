@@ -18,6 +18,7 @@ describe('Bootstrap', () => {
       user_id: '5e7659b9-0889-4ea4-b851-40b3e9c82b7a',
       membership: { state: 'pending', role: null },
       profile: null,
+      pending_expires_at: '2026-09-26T08:00:00+00:00',
     });
     expect(parsed.profile).toBeNull();
   });
@@ -28,6 +29,7 @@ describe('Bootstrap', () => {
         user_id: '5e7659b9-0889-4ea4-b851-40b3e9c82b7a',
         membership: { state: 'admin', role: null },
         profile: null,
+        pending_expires_at: null,
       }).success,
     ).toBe(false);
   });

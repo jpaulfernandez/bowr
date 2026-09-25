@@ -37,10 +37,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P0.02-T1** Add private invite digests, redemptions, atomic throttles and audit records. Generate ≥128-bit random single-use codes, default seven-day expiry; return plaintext once. Lock membership/invite rows on redemption, enforce five attempts/hour/account plus IP throttle, and return a generic unavailable-code error.
-- [ ] **P0.02-T2** Build owner invite create/copy/revoke/status and safe member summary; pending gate supports paste, retry time, sign out and account deletion. No automatic message delivery; no private note/code in analytics or logs.
+- [x] **P0.02-T1** Add private invite digests, redemptions, atomic throttles and audit records. Generate ≥128-bit random single-use codes, default seven-day expiry; return plaintext once. Lock membership/invite rows on redemption, enforce five attempts/hour/account plus IP throttle, and return a generic unavailable-code error.
+- [x] **P0.02-T2** Build owner invite create/copy/revoke/status and safe member summary; pending gate supports paste, retry time, sign out and account deletion. No automatic message delivery; no private note/code in analytics or logs.
 - [ ] **P0.02-T3** Configure staging Google OAuth/PKCE, exact callbacks and verified custom SMTP. Implement expired-link/resend/change-email and cross-browser recovery. Add onboarding privacy text, skip/explore, and availability-aware next actions.
-- [ ] **P0.02-T4** Implement hourly pending-account cleanup after 24 hours with lock/recheck/deleting transition; failed Auth deletion stays retryable. Establish private API error mapping and idempotency envelopes for these commands.
+- [x] **P0.02-T4** Implement hourly pending-account cleanup after 24 hours with lock/recheck/deleting transition; failed Auth deletion stays retryable. Establish private API error mapping and idempotency envelopes for these commands.
 
 Acceptance:
 

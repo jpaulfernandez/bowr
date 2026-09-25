@@ -420,3 +420,7 @@ enabled = true
 # application error envelope stay under bowr's control.
 [functions.api]
 verify_jwt = false
+
+# Scheduled maintenance authenticates with a machine secret, not a user JWT.
+[functions.maintenance]
+verify_jwt = false

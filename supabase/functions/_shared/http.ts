@@ -27,6 +27,7 @@ const messages: Record<string, string> = {
   REVISION_CONFLICT: 'This changed somewhere else. Reload and try again.',
   IDEMPOTENCY_CONFLICT: 'This request was already used for different input.',
   VALIDATION_FAILED: 'Check the highlighted values.',
+  INVITE_UNAVAILABLE: "This invite code isn't available. Check it, or ask the owner for a new one.",
   RATE_LIMITED: 'Too many attempts. Try again later.',
   SERVICE_UNAVAILABLE: 'bowr is temporarily unavailable.',
   INTERNAL: 'Something went wrong.',

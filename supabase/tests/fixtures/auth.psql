@@ -20,7 +20,8 @@ begin
     role = p_role,
     joined_at = case when p_state in ('active', 'suspended') then now() end,
     suspended_at = case when p_state = 'suspended' then now() end,
-    deleting_at = case when p_state = 'deleting' then now() end
+    deleting_at = case when p_state = 'deleting' then now() end,
+    deletion_reason = case when p_state = 'deleting' then 'account_deleted' end
   where user_id = v_id;
   return v_id;
 end;

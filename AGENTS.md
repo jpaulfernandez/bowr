@@ -119,6 +119,7 @@ Run from the repository root. Prerequisites: Node 22, pnpm 10, uv, Docker. Setup
 | Local stack | `pnpm db:start` / `pnpm db:stop` |
 | Migration reset | `pnpm db:reset` |
 | Database tests (pgTAP) | `pnpm test:db` |
+| Integration tests (races, Edge API) | `pnpm test:integration` (needs `pnpm db:start`) |
 | Web export + bundle inspection | `pnpm build:web` |
 | E2E (Playwright + axe) | `pnpm build:web && pnpm test:e2e` |
 | Worker tests (pytest) | `pnpm worker:test` |

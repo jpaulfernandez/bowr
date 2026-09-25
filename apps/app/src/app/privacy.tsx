@@ -13,8 +13,14 @@ export default function Privacy() {
           records, and the settings you choose: display name, optional city, timezone, language and units.
         </Text>
         <Text>
-          Your wardrobe is private. Other members, including the owner who invited you, cannot see your settings or
-          wardrobe. The owner can manage invitations and see membership status.
+          Your wardrobe is private. Other members, including the owner, cannot see your wardrobe or settings. The owner
+          can see your display name, who invited you, when you joined and when you last signed in, so they can manage
+          access.
+        </Text>
+        <Text>
+          bowr is invite-only. An account that has not entered an invite code within 24 hours of signing up is deleted
+          automatically, and you can delete it yourself sooner from the invite screen. Invite codes are stored only as a
+          keyed fingerprint, and bowr limits how often codes can be tried.
         </Text>
         <Heading level={2}>This browser</Heading>
         <Text>

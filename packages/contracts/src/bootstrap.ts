@@ -25,6 +25,8 @@ export const Bootstrap = z.object({
     role: MembershipRole.nullable(),
   }),
   profile: ProfileSettings.nullable(),
+  /** When an unredeemed account will be removed; null for other states. */
+  pending_expires_at: z.string().nullable(),
 });
 export type Bootstrap = z.infer<typeof Bootstrap>;
 

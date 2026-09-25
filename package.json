@@ -11,7 +11,7 @@
     "lint": "eslint . && pnpm lint:functions && pnpm worker:lint",
     "lint:functions": "cd supabase/functions && deno lint && deno fmt --check",
     "typecheck": "pnpm -r --parallel run typecheck && pnpm typecheck:functions",
-    "typecheck:functions": "deno check --config supabase/functions/deno.json supabase/functions/api/index.ts",
+    "typecheck:functions": "deno check --config supabase/functions/deno.json supabase/functions/api/index.ts supabase/functions/maintenance/index.ts",
     "test:unit": "vitest run --project packages",
     "test:db": "supabase test db",
     "test:e2e": "playwright test",
@@ -21,7 +21,8 @@
     "build:web": "pnpm --filter @bowr/app export:web && pnpm --filter @bowr/app check:web",
     "worker:test": "cd services/worker && uv run pytest",
     "worker:lint": "cd services/worker && uv run ruff check . && uv run ruff format --check .",
-    "ops:bootstrap-owner": "node scripts/ops/bootstrap-owner.mjs"
+    "ops:bootstrap-owner": "node scripts/ops/bootstrap-owner.mjs",
+    "test:integration": "vitest run --project integration"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

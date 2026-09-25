@@ -21,7 +21,8 @@ export async function createIdentity(
       role = ${role},
       joined_at = case when ${state} in ('active', 'suspended') then now() end,
       suspended_at = case when ${state} = 'suspended' then now() end,
-      deleting_at = case when ${state} = 'deleting' then now() end
+      deleting_at = case when ${state} = 'deleting' then now() end,
+      deletion_reason = case when ${state} = 'deleting' then 'account_deleted' end
     where user_id = ${id}`;
   if (displayName) await db`update public.profiles set display_name = ${displayName} where id = ${id}`;
   return { id, email };

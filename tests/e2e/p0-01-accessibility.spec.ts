@@ -1,7 +1,7 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { signIn } from './support/auth';
-import { createIdentity } from './support/identities';
+import { createIdentity } from '../support/identities';
 
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
@@ -143,7 +143,7 @@ test.describe('P0.01-A4: web export delivery', () => {
     expect((await manifest.json()).start_url).toBe('/');
 
     await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1, name: 'bowr' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'bowr', exact: true })).toBeVisible();
     expect(await page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length)).toBe(0);
   });
 });

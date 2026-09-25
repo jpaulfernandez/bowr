@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { requestLink, signIn } from './support/auth';
-import { createIdentity } from './support/identities';
+import { createIdentity } from '../support/identities';
 
 test.describe('P0.01 demo: members and a pending identity see only their gate and own settings', () => {
   test('members see their own settings; pending sees the gate', async ({ browser }) => {
@@ -50,7 +50,7 @@ test.describe('P0.01 demo: members and a pending identity see only their gate an
       await page.goto('/settings');
       await expect(page).toHaveURL(/\/invite$/);
       await page.getByRole('button', { name: 'Sign out' }).click();
-      await expect(page.getByRole('heading', { level: 1, name: 'bowr' })).toBeVisible();
+      await expect(page.getByRole('heading', { level: 1, name: 'bowr', exact: true })).toBeVisible();
       await context.clearCookies();
     }
   });
@@ -111,7 +111,7 @@ test.describe('P0.01-A2: return destinations', () => {
     await page.getByRole('link', { name: 'More' }).click();
     await page.getByRole('link', { name: /Settings/ }).click();
     await page.getByRole('button', { name: 'Sign out' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'bowr' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'bowr', exact: true })).toBeVisible();
     await page.goto(link);
     await expect(page.getByText(/expired or was already used/)).toBeVisible();
   });
@@ -136,7 +136,7 @@ test.describe('P0.01-A3: account change and tab session', () => {
     await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')));
     await expect.poll(() => held.length).toBeGreaterThan(0);
     await page.getByRole('button', { name: 'Sign out' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'bowr' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'bowr', exact: true })).toBeVisible();
     for (const release of held.splice(0)) await release();
     await page.waitForTimeout(1000);
     await expect(page.getByText('Ana Late')).toHaveCount(0);

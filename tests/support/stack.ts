@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { createClient } from '@supabase/supabase-js';
 import postgres from 'postgres';
 
-type StackEnv = { API_URL: string; DB_URL: string; SERVICE_ROLE_KEY: string; MAILPIT_URL: string };
+type StackEnv = { API_URL: string; DB_URL: string; ANON_KEY: string; SERVICE_ROLE_KEY: string; MAILPIT_URL: string };
 
 let cached: StackEnv | null = null;
 
@@ -14,6 +14,7 @@ export function stack(): StackEnv {
   cached = {
     API_URL: parsed.API_URL!,
     DB_URL: parsed.DB_URL!,
+    ANON_KEY: parsed.ANON_KEY!,
     SERVICE_ROLE_KEY: parsed.SERVICE_ROLE_KEY!,
     MAILPIT_URL: parsed.MAILPIT_URL ?? parsed.INBUCKET_URL!,
   };
@@ -25,4 +26,7 @@ export const admin = () =>
 
 let sqlClient: ReturnType<typeof postgres> | null = null;
 /** Test-fixture database access. Application code never connects this way. */
-export const sql = () => (sqlClient ??= postgres(stack().DB_URL, { max: 4, onnotice: () => {} }));
+export const sql = () => (sqlClient ??= postgres(stack().DB_URL, { max: 12, onnotice: () => {} }));
+
+/** A separate connection pool, for tests that need independent transactions. */
+export const connection = () => postgres(stack().DB_URL, { max: 1, onnotice: () => {} });

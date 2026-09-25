@@ -10,6 +10,16 @@ export default defineConfig({
           environment: 'node',
         },
       },
+      {
+        test: {
+          name: 'integration',
+          include: ['supabase/tests/integration/**/*.test.ts'],
+          environment: 'node',
+          fileParallelism: false,
+          testTimeout: 60_000,
+          hookTimeout: 60_000,
+        },
+      },
     ],
   },
 });

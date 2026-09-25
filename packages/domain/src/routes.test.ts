@@ -31,6 +31,19 @@ describe('decideRoute', () => {
     }
   });
 
+  it('allows /admin only for the owner', () => {
+    const owner: Gate = { kind: 'signed-in', state: 'active', role: 'owner' };
+    expect(decideRoute('/admin', owner)).toEqual({ type: 'allow' });
+    expect(decideRoute('/admin', member)).toEqual({ type: 'redirect', to: '/wardrobe' });
+    expect(decideRoute('/admin', pending)).toEqual({ type: 'redirect', to: '/invite' });
+    expect(decideRoute('/admin', anonymous)).toEqual({ type: 'redirect', to: '/auth?returnTo=%2Fadmin' });
+  });
+
+  it('lets a new member open onboarding', () => {
+    expect(decideRoute('/onboarding', member)).toEqual({ type: 'allow' });
+    expect(decideRoute('/onboarding', pending)).toEqual({ type: 'redirect', to: '/invite' });
+  });
+
   it('moves admitted members away from public and gate screens', () => {
     expect(decideRoute('/auth', member)).toEqual({ type: 'redirect', to: '/wardrobe' });
     expect(decideRoute('/invite', member)).toEqual({ type: 'redirect', to: '/wardrobe' });
