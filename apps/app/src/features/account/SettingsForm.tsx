@@ -1,5 +1,6 @@
 import { ProfilePatch, ProfileSettings } from '@bowr/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { View } from 'react-native';
@@ -14,11 +15,15 @@ import { ApiError } from '../../lib/errors';
 import { userKeys } from '../../lib/query-keys';
 import { useSession } from '../../lib/session';
 import { supabase } from '../../lib/supabase';
+import { useBootstrap } from '../../lib/bootstrap';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { startReauth } from './reauth';
 
 const Profile = ProfileSettings.pick({
   display_name: true,
   city: true,
   timezone: true,
+  locale: true,
   temperature_unit: true,
   measurement_unit: true,
   revision: true,
@@ -29,6 +34,7 @@ type FormValues = {
   display_name: string;
   city: string;
   timezone: string;
+  locale: string;
   temperature_unit: Profile['temperature_unit'];
   measurement_unit: Profile['measurement_unit'];
 };
@@ -37,6 +43,7 @@ const toForm = (profile: Profile): FormValues => ({
   display_name: profile.display_name ?? '',
   city: profile.city ?? '',
   timezone: profile.timezone,
+  locale: profile.locale,
   temperature_unit: profile.temperature_unit,
   measurement_unit: profile.measurement_unit,
 });
@@ -57,7 +64,7 @@ function useProfile(userId: string) {
         await guardedRead(() =>
           supabase
             .from('profiles')
-            .select('display_name, city, timezone, temperature_unit, measurement_unit, revision')
+            .select('display_name, city, timezone, locale, temperature_unit, measurement_unit, revision')
             .abortSignal(signal)
             .single(),
         ),
@@ -83,10 +90,7 @@ function AccountSettings({ userId }: { userId: string }) {
         </Banner>
       ) : null}
       {profile.data ? <ProfileEditor userId={userId} profile={profile.data} /> : null}
-      <View className="gap-3">
-        <Heading level={2}>Account</Heading>
-        <Button label="Sign out" variant="secondary" onPress={() => void signOut()} />
-      </View>
+      <AccountSection onSignOut={() => void signOut()} />
     </View>
   );
 }
@@ -221,6 +225,23 @@ function ProfileEditor({ userId, profile }: { userId: string; profile: Profile }
         />
         <Controller
           control={form.control}
+          name="locale"
+          render={({ field }) => (
+            <RadioGroup
+              label="Date and number format"
+              value={field.value}
+              onChange={(value) => field.onChange(value)}
+              options={[
+                { value: 'en', label: 'Default' },
+                { value: 'en-PH', label: 'English (Philippines)' },
+                { value: 'en-US', label: 'English (US)' },
+                { value: 'en-GB', label: 'English (UK)' },
+              ]}
+            />
+          )}
+        />
+        <Controller
+          control={form.control}
           name="temperature_unit"
           render={({ field }) => (
             <RadioGroup
@@ -256,6 +277,69 @@ function ProfileEditor({ userId, profile }: { userId: string; profile: Profile }
         </Banner>
       ) : null}
       <Button label="Save settings" busy={save.isPending} busyLabel="Saving" onPress={() => void onSubmit()} />
+    </View>
+  );
+}
+
+function AccountSection({ onSignOut }: { onSignOut: () => void }) {
+  const bootstrap = useBootstrap();
+  const identity = useQuery({
+    queryKey: ['auth-identity'],
+    queryFn: async () => (await supabase.auth.getUser()).data.user,
+    staleTime: Infinity,
+  });
+  const [confirming, setConfirming] = useState(false);
+  const [sent, setSent] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const start = useMutation({
+    mutationFn: () => startReauth('delete_account'),
+    onSuccess: (result) => {
+      setConfirming(false);
+      setSent(
+        result.via === 'email'
+          ? `We sent a confirmation link to ${result.email}. Open it in this browser to finish deleting your account.`
+          : 'Continue with Google to confirm.',
+      );
+    },
+    onError: () => {
+      setConfirming(false);
+      setError("bowr couldn't start the confirmation. Try again.");
+    },
+  });
+  const isOwner = bootstrap.data?.membership.role === 'owner';
+  const provider = identity.data?.app_metadata.provider === 'google' ? 'Google' : 'Email link';
+
+  return (
+    <View className="gap-3">
+      <Heading level={2}>Account</Heading>
+      {identity.data?.email ? <Text variant="secondary">{`Signed in with ${provider} as ${identity.data.email}`}</Text> : null}
+      <Button label="Sign out" variant="secondary" onPress={onSignOut} />
+      <Link href="/privacy" className="min-h-target self-start py-3 text-action text-accent underline">
+        How bowr handles your data
+      </Link>
+      <Heading level={3}>Delete account</Heading>
+      <Text variant="secondary">
+        {isOwner
+          ? 'You are the owner. If other members are active, transfer ownership in Admin before deleting your account.'
+          : 'Deleting your account removes your wardrobe, photos and settings.'}
+      </Text>
+      {sent ? <Banner tone="info" message={sent} /> : null}
+      {error ? <Banner tone="error" message={error} /> : null}
+      <Button label="Delete my account" variant="destructive" onPress={() => setConfirming(true)} />
+      <ConfirmDialog
+        visible={confirming}
+        title="Delete your account?"
+        consequences={[
+          'Your pieces, photos, uploads and settings will be permanently deleted.',
+          'Other members keep their accounts. Shared AI spend records stay without your name.',
+          'To confirm, we will send a new sign-in link to your email. Deletion happens only after you open it.',
+        ]}
+        confirmLabel="Send confirmation link"
+        destructive
+        busy={start.isPending}
+        onConfirm={() => start.mutate()}
+        onCancel={() => setConfirming(false)}
+      />
     </View>
   );
 }

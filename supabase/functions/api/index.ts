@@ -2,7 +2,9 @@
 import { aiEnabled, runDiagnostic } from '../_shared/ai-gateway.ts';
 import { requireCaller } from '../_shared/auth.ts';
 import { appError, errorResponse, fromDatabaseError, json, preflight } from '../_shared/http.ts';
+import { sha256Hex } from '../_shared/capability.ts';
 import { afterResponse, dispatchJob } from '../_shared/dispatch.ts';
+import { processAccountDeletions } from '../_shared/lifecycle.ts';
 import { clientIpHash, generateInviteCode, inviteDigest } from '../_shared/invite-codes.ts';
 import { serviceClient } from '../_shared/service.ts';
 import { bucketName, headObject, presignGet, presignPut } from '../_shared/storage.ts';
@@ -316,6 +318,104 @@ route('POST', /^\/v1\/admin\/ai-diagnostic$/, async ({ req, requestId }) => {
   // The request identity is the attempt identity: a retry never sends a second call.
   const outcome = await runDiagnostic(`diagnostic:${userId}:${key}`, userId);
   return json(req, requestId, 200, outcome);
+});
+
+// --- Account lifecycle ------------------------------------------------------
+
+const randomToken = () =>
+  Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, '0')).join('');
+
+route('POST', /^\/v1\/account\/reauth-challenges$/, async ({ req, requestId }) => {
+  const { userId, sessionId } = await requireCaller(req);
+  idempotencyKey(req);
+  const body = await jsonBody(req, ['action']);
+  return json(
+    req,
+    requestId,
+    201,
+    await callService('svc_create_reauth_challenge', {
+      p_user_id: userId,
+      p_action: body.action,
+      p_session_id: sessionId,
+    }),
+  );
+});
+
+route('POST', /^\/v1\/account\/reauth-challenges\/([^/]+)\/verify$/, async ({ req, requestId, params }) => {
+  const { userId, sessionId, authenticatedAt } = await requireCaller(req);
+  idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(403, 'REAUTH_REQUIRED');
+  // The proof exists only in this response; the database keeps its hash.
+  const proof = randomToken();
+  const result = await callService('svc_verify_reauth_challenge', {
+    p_user_id: userId,
+    p_challenge_id: params[0],
+    p_session_id: sessionId,
+    p_authenticated_at: authenticatedAt?.toISOString() ?? null,
+    p_proof_hash: await sha256Hex(proof),
+  });
+  return json(req, requestId, 200, { ...(result as Record<string, unknown>), proof });
+});
+
+route('DELETE', /^\/v1\/account$/, async ({ req, requestId }) => {
+  const { userId } = await requireCaller(req);
+  idempotencyKey(req);
+  const body = await jsonBody(req, ['proof']);
+  if (typeof body.proof !== 'string' || !/^[0-9a-f]{64}$/.test(body.proof)) throw appError(403, 'REAUTH_REQUIRED');
+  const statusToken = randomToken();
+  const result = await callService('svc_start_account_deletion', {
+    p_user_id: userId,
+    p_proof_hash: await sha256Hex(body.proof),
+    p_status_token_hash: await sha256Hex(statusToken),
+  });
+  afterResponse(processAccountDeletions());
+  // The status token only reveals deletion progress; it is not an access credential.
+  return json(req, requestId, 202, { ...(result as Record<string, unknown>), status_token: statusToken });
+});
+
+route('GET', /^\/v1\/account\/deletion-status$/, async ({ req, requestId }) => {
+  const token = req.headers.get('X-Deletion-Status') ?? '';
+  if (!/^[0-9a-f]{64}$/.test(token)) throw appError(404, 'NOT_FOUND');
+  return json(
+    req,
+    requestId,
+    200,
+    await callService('svc_account_deletion_status', { p_status_token_hash: await sha256Hex(token) }),
+  );
+});
+
+route('POST', /^\/v1\/admin\/members\/([^/]+)\/(suspend|restore)$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  return json(
+    req,
+    requestId,
+    200,
+    await callService('svc_admin_set_suspension', {
+      p_actor_id: userId,
+      p_member_id: params[0],
+      p_suspend: params[1] === 'suspend',
+    }),
+  );
+});
+
+route('POST', /^\/v1\/admin\/ownership-transfer$/, async ({ req, requestId }) => {
+  const { userId } = await requireCaller(req);
+  idempotencyKey(req);
+  const body = await jsonBody(req, ['recipient_user_id', 'proof']);
+  if (!isUuid(body.recipient_user_id)) throw appError(422, 'INVALID_RECIPIENT');
+  if (typeof body.proof !== 'string' || !/^[0-9a-f]{64}$/.test(body.proof)) throw appError(403, 'REAUTH_REQUIRED');
+  return json(
+    req,
+    requestId,
+    200,
+    await callService('svc_transfer_ownership', {
+      p_actor_id: userId,
+      p_recipient_id: body.recipient_user_id,
+      p_proof_hash: await sha256Hex(body.proof),
+    }),
+  );
 });
 
 route('GET', /^\/v1\/admin\/overview$/, async ({ req, requestId }) => {

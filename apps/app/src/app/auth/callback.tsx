@@ -5,6 +5,7 @@ import { Banner } from '../../components/Banner';
 import { Button } from '../../components/Button';
 import { LoadingScreen } from '../../components/LoadingScreen';
 import { Screen } from '../../components/Screen';
+import { readPendingReauth } from '../../features/account/reauth';
 import { takeReturnTo } from '../../lib/account-storage';
 import { supabase } from '../../lib/supabase';
 
@@ -40,7 +41,8 @@ export default function AuthCallback() {
         setFailure(missingVerifier ? 'other-browser' : error.status === 403 ? 'expired' : 'failed');
         return;
       }
-      router.replace((takeReturnTo() ?? '/') as '/');
+      // A fresh sign-in that completes a pending confirmation goes straight to it.
+      router.replace((readPendingReauth() ? '/settings/confirm' : (takeReturnTo() ?? '/')) as '/');
     });
   }, [failure, params.code]);
 

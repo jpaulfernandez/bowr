@@ -38,6 +38,10 @@ const messages: Record<string, string> = {
   RETRY_LIMIT_REACHED: 'This photo has been retried too many times. Choose it again or remove it.',
   CAPABILITY_REJECTED: 'Capability rejected.',
   OUTPUT_REJECTED: 'Output rejected.',
+  REAUTH_REQUIRED: 'Confirm with a new sign-in link first.',
+  OWNER_TRANSFER_REQUIRED: 'Transfer ownership to another member before deleting this account.',
+  CANNOT_SUSPEND_OWNER: 'The owner cannot be suspended.',
+  INVALID_RECIPIENT: 'Choose an active member to become the owner.',
   INVITE_UNAVAILABLE: "This invite code isn't available. Check it, or ask the owner for a new one.",
   RATE_LIMITED: 'Too many attempts. Try again later.',
   SERVICE_UNAVAILABLE: 'bowr is temporarily unavailable.',
@@ -62,7 +66,8 @@ export function corsHeaders(req: Request): Record<string, string> {
   if (!origin || !allowedOrigins().has(origin)) return {};
   return {
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Headers': 'authorization, content-type, idempotency-key, apikey, x-client-info',
+    'Access-Control-Allow-Headers':
+      'authorization, content-type, idempotency-key, apikey, x-client-info, x-deletion-status',
     'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
     'Access-Control-Max-Age': '600',
     Vary: 'Origin',

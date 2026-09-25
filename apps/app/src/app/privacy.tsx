@@ -22,6 +22,13 @@ export default function Privacy() {
           automatically, and you can delete it yourself sooner from the invite screen. Invite codes are stored only as a
           keyed fingerprint, and bowr limits how often codes can be tried.
         </Text>
+        <Heading level={2}>Leaving bowr</Heading>
+        <Text>
+          You can delete your account in Settings. bowr asks you to confirm with a new sign-in, then immediately blocks
+          access and deletes your uploads, photos and settings. Stored photos are removed from storage and checked,
+          then your sign-in is deleted. Shared AI spend records are kept without your name. The owner can pause a
+          member&apos;s access; the member&apos;s data is kept until they delete it.
+        </Text>
         <Heading level={2}>This browser</Heading>
         <Text>
           Your session is kept only in this browser tab. Closing the tab signs you out, and you will need a new sign-in

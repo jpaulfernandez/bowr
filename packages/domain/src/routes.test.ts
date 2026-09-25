@@ -28,6 +28,7 @@ describe('decideRoute', () => {
     for (const gate of [anonymous, pending, member]) {
       expect(decideRoute('/privacy', gate)).toEqual({ type: 'allow' });
       expect(decideRoute('/auth/callback', gate)).toEqual({ type: 'allow' });
+      expect(decideRoute('/account-deleted', gate)).toEqual({ type: 'allow' });
     }
   });
 

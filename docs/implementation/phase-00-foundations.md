@@ -115,10 +115,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P0.06-T1** Complete settings for display name, optional city, locale/timezone, units, sign out, privacy and account deletion. Add owner suspension with explicit consequences and no wardrobe/photo/profile access through administration.
-- [ ] **P0.06-T2** Implement action-bound ten-minute fresh-auth challenges, single-use proofs, transactional ownership transfer and last-owner deletion rules. A refreshed access token alone cannot prove fresh authentication.
-- [ ] **P0.06-T3** Build recoverable account deletion: mark deleting, block signing/reads/jobs, revoke sessions, capture asset manifest, delete domain/Auth data, detach safe accounting identity, preserve other members and nullable invite relationships. Provide restricted expiring deletion-status capability.
-- [ ] **P0.06-T4** Add lifecycle extension hooks for later domain cleanup, cache/object-URL disposal and analytics identity deletion/reset. UI distinguishes pending deletion from verified object absence.
+- [x] **P0.06-T1** Complete settings for display name, optional city, locale/timezone, units, sign out, privacy and account deletion. Add owner suspension with explicit consequences and no wardrobe/photo/profile access through administration.
+- [x] **P0.06-T2** Implement action-bound ten-minute fresh-auth challenges, single-use proofs, transactional ownership transfer and last-owner deletion rules. A refreshed access token alone cannot prove fresh authentication.
+- [x] **P0.06-T3** Build recoverable account deletion: mark deleting, block signing/reads/jobs, revoke sessions, capture asset manifest, delete domain/Auth data, detach safe accounting identity, preserve other members and nullable invite relationships. Provide restricted expiring deletion-status capability.
+- [x] **P0.06-T4** Add lifecycle extension hooks for later domain cleanup, cache/object-URL disposal and analytics identity deletion/reset. UI distinguishes pending deletion from verified object absence.
 
 Acceptance:
 

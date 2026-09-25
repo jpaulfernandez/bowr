@@ -7,6 +7,7 @@ import { Screen } from '../../../components/Screen';
 import { Heading, Text } from '../../../components/Text';
 import { AdminInvites, adminOverviewKey } from '../../../features/admin/AdminInvites';
 import { AdminSpend } from '../../../features/admin/AdminSpend';
+import { MemberActions } from '../../../features/admin/MemberActions';
 import { apiRequest } from '../../../lib/api';
 import { formatDate } from '../../../lib/format';
 import { useSession } from '../../../lib/session';
@@ -48,6 +49,7 @@ export default function Admin() {
                     {`${stateLabel[member.state]} · joined ${formatDate(member.joined_at)}${member.invited_by_name ? ` · invited by ${member.invited_by_name}` : ''}`}
                   </Text>
                   <Text variant="secondary">{`Last sign-in ${formatDate(member.last_sign_in_at)}`}</Text>
+                  {member.role !== 'owner' ? <MemberActions userId={userId} member={member} /> : null}
                 </View>
               ))}
             </View>

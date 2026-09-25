@@ -16,7 +16,7 @@ export const HOME_ROUTE = '/wardrobe';
 export const GATE_ROUTE = '/invite';
 export const SIGN_IN_ROUTE = '/auth';
 
-const alwaysAvailable = new Set(['/privacy', '/auth/callback']);
+const alwaysAvailable = new Set(['/privacy', '/auth/callback', '/account-deleted']);
 const publicRoutes = new Set(['/', '/auth', '/auth/check-email']);
 const gateRoutes = new Set([GATE_ROUTE]);
 /** Top-level member destinations. Nested paths inherit their prefix. */
