@@ -8,10 +8,10 @@
   },
   "scripts": {
     "check": "pnpm lint && pnpm typecheck && pnpm test:unit && pnpm worker:test",
-    "lint": "eslint . && pnpm lint:functions && pnpm worker:lint",
+    "lint": "eslint . && pnpm --filter @bowr/app lint:classes && pnpm lint:functions && pnpm worker:lint",
     "lint:functions": "cd supabase/functions && deno lint && deno fmt --check",
     "typecheck": "pnpm -r --parallel run typecheck && pnpm typecheck:functions",
-    "typecheck:functions": "deno check --config supabase/functions/deno.json supabase/functions/api/index.ts supabase/functions/maintenance/index.ts",
+    "typecheck:functions": "deno check --config supabase/functions/deno.json supabase/functions/api/index.ts supabase/functions/internal/index.ts supabase/functions/maintenance/index.ts",
     "test:unit": "vitest run --project packages",
     "test:db": "supabase test db",
     "test:e2e": "playwright test",
@@ -22,12 +22,17 @@
     "worker:test": "cd services/worker && uv run pytest",
     "worker:lint": "cd services/worker && uv run ruff check . && uv run ruff format --check .",
     "ops:bootstrap-owner": "node scripts/ops/bootstrap-owner.mjs",
-    "test:integration": "vitest run --project integration"
+    "test:integration": "vitest run --project integration",
+    "contracts:generate": "UPDATE_CONTRACTS=1 vitest run --project packages generated-contracts",
+    "storage:start": "docker compose -f infra/local/compose.yaml up -d && node scripts/dev/setup-storage.mjs",
+    "storage:stop": "docker compose -f infra/local/compose.yaml down",
+    "worker:serve": "cd services/worker && uv run python -m bowr_worker.local_server"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
     "@playwright/test": "1.63.0",
     "@supabase/supabase-js": "2.117.1",
+    "aws4fetch": "1.0.20",
     "deno": "2.9.6",
     "eslint": "9.39.1",
     "eslint-config-expo": "57.0.2",

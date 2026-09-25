@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { UploadLimits } from './uploads';
 
 export const MembershipState = z.enum(['pending', 'active', 'suspended', 'deleting']);
 export type MembershipState = z.infer<typeof MembershipState>;
@@ -27,6 +28,8 @@ export const Bootstrap = z.object({
   profile: ProfileSettings.nullable(),
   /** When an unredeemed account will be removed; null for other states. */
   pending_expires_at: z.string().nullable(),
+  /** Enforced upload limits for active members; null for other states. */
+  upload_limits: UploadLimits.nullable(),
 });
 export type Bootstrap = z.infer<typeof Bootstrap>;
 

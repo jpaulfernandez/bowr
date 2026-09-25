@@ -1,8 +1,10 @@
 // Public Edge API: https://<project>.supabase.co/functions/v1/api/v1/...
 import { requireCaller } from '../_shared/auth.ts';
 import { appError, errorResponse, fromDatabaseError, json, preflight } from '../_shared/http.ts';
+import { afterResponse, dispatchJob } from '../_shared/dispatch.ts';
 import { clientIpHash, generateInviteCode, inviteDigest } from '../_shared/invite-codes.ts';
 import { serviceClient } from '../_shared/service.ts';
+import { bucketName, headObject, presignGet, presignPut } from '../_shared/storage.ts';
 import { idempotencyKey, isUuid, jsonBody } from '../_shared/validate.ts';
 
 type Context = { req: Request; requestId: string; params: string[] };
@@ -17,11 +19,187 @@ async function callService(name: string, args: Record<string, unknown>): Promise
   return data;
 }
 
+const heicEnabled = () => Deno.env.get('UPLOAD_HEIC_ENABLED') === 'true';
+const uploadFormats =
+  () => ['image/jpeg', 'image/png', 'image/webp', ...(heicEnabled() ? ['image/heic', 'image/heif'] : [])];
+
 route('GET', /^\/v1\/bootstrap$/, async ({ req, requestId }) => {
   const { db } = await requireCaller(req);
   const { data, error } = await db.rpc('get_bootstrap');
   if (error) throw fromDatabaseError(error);
-  return json(req, requestId, 200, data);
+  const bootstrap = data as { membership: { state: string }; upload_limits?: Record<string, unknown> | null };
+  // Limits come from the server so UI copy cannot drift from what is enforced.
+  if (bootstrap.upload_limits) bootstrap.upload_limits = { ...bootstrap.upload_limits, formats: uploadFormats() };
+  return json(req, requestId, 200, bootstrap);
+});
+
+// --- Uploads ---------------------------------------------------------------
+
+type SlotRow = {
+  entry_id: string;
+  client_file_id: string;
+  asset_id: string;
+  state: string;
+  content_type: string;
+  upload_expires_at: string;
+  object_key?: string | null;
+};
+
+async function publicSlot(row: SlotRow) {
+  const seconds = (Date.parse(row.upload_expires_at) - Date.now()) / 1000;
+  const upload = row.object_key && row.state === 'awaiting_upload' && seconds > 1
+    ? {
+      method: 'PUT',
+      url: await presignPut(row.object_key, row.content_type, seconds),
+      headers: { 'Content-Type': row.content_type },
+      expires_at: row.upload_expires_at,
+    }
+    : null;
+  // Object keys stay server-side; the client receives only IDs and a signed URL.
+  return {
+    entry_id: row.entry_id,
+    client_file_id: row.client_file_id,
+    asset_id: row.asset_id,
+    state: row.state,
+    upload,
+  };
+}
+
+route('POST', /^\/v1\/upload-batches$/, async ({ req, requestId }) => {
+  const { userId } = await requireCaller(req);
+  const key = idempotencyKey(req);
+  const body = await jsonBody(req, ['files']);
+  if (!Array.isArray(body.files) || body.files.length < 1 || body.files.length > 20) {
+    throw appError(422, 'VALIDATION_FAILED', { field: 'files' });
+  }
+  const files = body.files.map((file: unknown) => {
+    const f = (file ?? {}) as Record<string, unknown>;
+    const unexpected = Object.keys(f).filter((k) =>
+      !['client_file_id', 'purpose', 'content_type', 'byte_size', 'rotation'].includes(k)
+    );
+    if (unexpected.length > 0 || !isUuid(f.client_file_id)) {
+      throw appError(422, 'VALIDATION_FAILED', {
+        field: 'files',
+        reason: unexpected.length > 0 ? 'unexpected_fields' : 'client_file_id',
+      });
+    }
+    if (!uploadFormats().includes(String(f.content_type))) {
+      throw appError(415, 'UNSUPPORTED_MEDIA', { client_file_id: f.client_file_id });
+    }
+    return {
+      client_file_id: String(f.client_file_id).toLowerCase(),
+      purpose: f.purpose,
+      content_type: f.content_type,
+      byte_size: f.byte_size,
+      rotation: f.rotation ?? 0,
+    };
+  });
+  const batch = (await callService('svc_create_upload_batch', {
+    p_user_id: userId,
+    p_request_id: key,
+    p_bucket: bucketName(),
+    p_files: files,
+  })) as { batch_id: string; replayed: boolean; entries: SlotRow[] };
+  return json(req, requestId, batch.replayed ? 200 : 201, {
+    batch_id: batch.batch_id,
+    entries: await Promise.all(batch.entries.map(publicSlot)),
+  });
+});
+
+route('POST', /^\/v1\/upload-entries\/([^/]+)\/renew$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  const row = (await callService('svc_renew_upload_entry', { p_user_id: userId, p_entry_id: params[0] })) as {
+    entry_id: string;
+    object_key: string;
+    content_type: string;
+    upload_expires_at: string;
+  };
+  const seconds = (Date.parse(row.upload_expires_at) - Date.now()) / 1000;
+  return json(req, requestId, 200, {
+    entry_id: row.entry_id,
+    upload: {
+      method: 'PUT',
+      url: await presignPut(row.object_key, row.content_type, seconds),
+      headers: { 'Content-Type': row.content_type },
+      expires_at: row.upload_expires_at,
+    },
+  });
+});
+
+route('POST', /^\/v1\/upload-entries\/([^/]+)\/complete$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  const key = idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  const object = (await callService('svc_upload_entry_object', { p_user_id: userId, p_entry_id: params[0] })) as {
+    state: string;
+    object_key: string | null;
+  };
+  // Upload success is only a claim: the server checks the object itself.
+  const head = object.state === 'awaiting_upload' && object.object_key ? await headObject(object.object_key) : null;
+  const result = (await callService('svc_complete_upload_entry', {
+    p_user_id: userId,
+    p_request_id: key,
+    p_entry_id: params[0],
+    p_object_size: head?.size ?? null,
+  })) as { entry_id: string; state: string; job_id: string | null; failure_code: string | null };
+  if (result.job_id && result.state === 'uploaded') afterResponse(dispatchJob(result.job_id));
+  return json(req, requestId, 202, { ...result, poll_after_ms: 2000 });
+});
+
+route('POST', /^\/v1\/upload-entries\/([^/]+)\/cancel$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  return json(
+    req,
+    requestId,
+    200,
+    await callService('svc_cancel_upload_entry', { p_user_id: userId, p_entry_id: params[0] }),
+  );
+});
+
+route('POST', /^\/v1\/media\/access$/, async ({ req, requestId }) => {
+  const { userId } = await requireCaller(req);
+  const body = await jsonBody(req, ['requests']);
+  if (!Array.isArray(body.requests) || body.requests.length < 1 || body.requests.length > 50) {
+    throw appError(422, 'VALIDATION_FAILED', { field: 'requests' });
+  }
+  const requests = body.requests.map((r: unknown) => {
+    const request = (r ?? {}) as Record<string, unknown>;
+    return { asset_id: isUuid(request.asset_id) ? request.asset_id : null, variant: String(request.variant ?? '') };
+  });
+  const grants =
+    (await callService('svc_authorize_media_access', { p_user_id: userId, p_requests: requests })) as Array<{
+      asset_id: string | null;
+      variant: string;
+      status: 'ok' | 'not_found';
+      object_key?: string;
+      expires_at?: string;
+      width?: number;
+      height?: number;
+    }>;
+  return json(
+    req,
+    requestId,
+    200,
+    await Promise.all(grants.map(async (grant) => {
+      const seconds = grant.expires_at ? (Date.parse(grant.expires_at) - Date.now()) / 1000 : 0;
+      if (grant.status !== 'ok' || !grant.object_key || seconds < 1) {
+        return { asset_id: grant.asset_id, variant: grant.variant, status: 'not_found' };
+      }
+      return {
+        asset_id: grant.asset_id,
+        variant: grant.variant,
+        status: 'ok',
+        url: await presignGet(grant.object_key, seconds),
+        expires_at: grant.expires_at,
+        width: grant.width,
+        height: grant.height,
+      };
+    })),
+  );
 });
 
 route('POST', /^\/v1\/invites\/redeem$/, async ({ req, requestId }) => {

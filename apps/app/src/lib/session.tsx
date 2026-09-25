@@ -2,6 +2,7 @@ import type { Session } from '@supabase/supabase-js';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { disposeAccountResources } from './account-lifecycle';
 import { clearAccountStorage } from './account-storage';
 import { supabase } from './supabase';
 
@@ -36,6 +37,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         currentUserId = nextUserId;
         void queryClient.cancelQueries();
         queryClient.clear();
+        disposeAccountResources();
       }
       setState({ status: 'ready', userId: nextUserId });
     };
@@ -51,6 +53,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const discardSession = useCallback(async () => {
     await queryClient.cancelQueries();
     queryClient.clear();
+    disposeAccountResources();
     clearAccountStorage();
     await supabase.auth.signOut({ scope: 'local' });
   }, [queryClient]);

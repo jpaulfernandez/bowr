@@ -27,10 +27,20 @@ export default function Privacy() {
           Your session is kept only in this browser tab. Closing the tab signs you out, and you will need a new sign-in
           link. Signing out clears what bowr loaded for your account in this tab.
         </Text>
+        <Heading level={2}>Photos</Heading>
+        <Text>
+          Photos you add are stored privately for your account. Only you can view them, through links that expire after
+          a few minutes. The owner cannot see them.
+        </Text>
+        <Text>
+          bowr checks each upload on its own processing service. It keeps a resized copy of the photo with location,
+          camera and other embedded details removed, and deletes the file you uploaded after checking it. Uploads that
+          are canceled or cannot be used are deleted too.
+        </Text>
         <Heading level={2}>Not collected yet</Heading>
         <Text>
-          bowr does not yet store photos, send anything to an AI provider, or record usage analytics. This page will
-          change before any of those features are turned on.
+          bowr does not yet send anything to an AI provider or record usage analytics. This page will change before
+          either is turned on.
         </Text>
       </Prose>
     </Screen>

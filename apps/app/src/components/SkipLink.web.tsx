@@ -3,7 +3,7 @@ export function SkipLink() {
   return (
     <a
       href="#main"
-      className="absolute left-2 top-2 z-10 -translate-y-24 rounded-control bg-accent px-4 py-3 text-action text-on-accent focus:translate-y-0"
+      className="sr-only rounded-control bg-accent px-4 py-3 text-action text-on-accent focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-10"
     >
       Skip to content
     </a>

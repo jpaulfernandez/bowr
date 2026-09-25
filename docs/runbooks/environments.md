@@ -40,3 +40,26 @@ select vault.create_secret('<MAINTENANCE_SECRET value>', 'bowr_maintenance_secre
 ```
 
 The migration schedules `bowr-pending-account-cleanup` hourly. If either Vault secret is missing, the job logs a warning and does nothing. P0.07 adds an independent heartbeat alert for missed runs.
+
+## Private media storage and worker (P0.03)
+
+| Name | Where it lives | Used by |
+| --- | --- | --- |
+| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Edge Function secrets | Signing and object checks; scoped R2 API token for the bucket only |
+| `R2_BUCKET` | Edge Function secrets | Private bucket name |
+| `R2_PUBLIC_ENDPOINT` | Edge Function secrets | `https://<account-id>.r2.cloudflarestorage.com` |
+| `R2_INTERNAL_ENDPOINT` | Edge Function secrets (optional) | Same as public for R2 |
+| `EXPO_PUBLIC_MEDIA_ORIGIN` | Web build environment (public) | CSP `connect-src`/`img-src` for signed uploads and views |
+| `UPLOAD_HEIC_ENABLED` | Edge Function secrets | Advertise HEIC only after the deployed worker passes the HEIC fixtures |
+| `WORKER_DISPATCH_URL` | Edge Function secrets | The Modal `wake` endpoint URL |
+| `WORKER_DISPATCH_KEY`, `WORKER_DISPATCH_SECRET` | Edge Function secrets | Modal proxy-auth token (sent as `Modal-Key`/`Modal-Secret`) |
+| `WORKER_CAPABILITY_SECRET` | Edge Function secrets | Signs job-scoped worker capabilities |
+| Modal secret `bowr-worker-config` | Modal | `BOWR_INTERNAL_API_URL=https://<project-ref>.supabase.co/functions/v1/internal` only |
+
+### Staging setup (P0.03-T2 gate, not yet done)
+
+1. Create a private R2 bucket with no public access and no custom domain. Create an R2 API token scoped to that bucket with object read/write.
+2. Apply exact-origin CORS for the web origin with `node scripts/dev/setup-storage.mjs`, using the staging `R2_*` and `APP_ORIGINS` values. The rule allows only `PUT` and `GET` with the `content-type` header.
+3. Deploy the worker with `cd services/worker && uv run --extra modal modal deploy modal_app.py`. Create a Modal proxy-auth token for the `wake` endpoint, then set `WORKER_DISPATCH_*` in the Edge secrets.
+4. Upload each MEDIA fixture through the deployed path (JPEG with EXIF orientation and GPS, PNG, WebP, HEIC, spoofed MIME, animated, over-limit). Confirm the outcomes match `supabase/tests/integration/p0_03_uploads.test.ts`. Set `UPLOAD_HEIC_ENABLED=true` only after the HEIC case passes on Modal.
+5. Record the R2 location hint and Modal region in this file. They are not guarantees of processing location.

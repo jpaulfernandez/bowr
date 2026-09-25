@@ -19,6 +19,8 @@ pnpm install
 # Local Supabase: Postgres, Auth, Edge runtime and Mailpit for sign-in emails.
 cp supabase/functions/.env.example supabase/functions/.env
 pnpm db:start
+pnpm storage:start           # S3-compatible stand-in for the private R2 bucket
+pnpm worker:serve            # photo validation worker (keep running in another terminal)
 
 # Web client configuration: public values only.
 cp apps/app/.env.example apps/app/.env.local

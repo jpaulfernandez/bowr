@@ -424,3 +424,7 @@ verify_jwt = false
 # Scheduled maintenance authenticates with a machine secret, not a user JWT.
 [functions.maintenance]
 verify_jwt = false
+
+# Worker API: authenticated by single-use claim tokens and job capabilities.
+[functions.internal]
+verify_jwt = false

@@ -56,10 +56,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P0.03-T1** Add upload batches/entries, media metadata, private object manifest, mutation identities and asset lifecycle. Create signed PUT/renew/complete and media-access APIs; clients supply descriptors/asset IDs, never object keys. Use stable file identities and typed attachments.
+- [x] **P0.03-T1** Add upload batches/entries, media metadata, private object manifest, mutation identities and asset lifecycle. Create signed PUT/renew/complete and media-access APIs; clients supply descriptors/asset IDs, never object keys. Use stable file identities and typed attachments.
 - [ ] **P0.03-T2** Configure private staging R2 bucket and exact-origin CORS. Use 10-minute PUT and 5-minute GET defaults, clipped to temporary expiry; `no-store` responses and memory-only images. Separate writable quarantine keys from server-controlled validated objects.
-- [ ] **P0.03-T3** Implement worker decode/normalization contract: 20 MiB and 40 MP bounds, orientation/rotation, sRGB, EXIF/GPS removal, sanitized 1024 px original and 2048 px care-label exception. Pin and prove HEIC decoder before advertising it; reject animations/unsupported/corrupt bytes. Introduce the minimal persisted validation-job identity and authenticated scoped dispatch/callback needed for this path now; P0.04 completes its lease/recovery behavior. Do not create a disposable synchronous or unauthenticated worker path.
-- [ ] **P0.03-T4** Build receipt/status, per-file validation failure, camera-denied/file-picker alternative and expired-image refresh-once behavior. Introduce temporary deletion tasks; cancel rejects access and rechecks raw keys after PUT expiry.
+- [x] **P0.03-T3** Implement worker decode/normalization contract: 20 MiB and 40 MP bounds, orientation/rotation, sRGB, EXIF/GPS removal, sanitized 1024 px original and 2048 px care-label exception. Pin and prove HEIC decoder before advertising it; reject animations/unsupported/corrupt bytes. Introduce the minimal persisted validation-job identity and authenticated scoped dispatch/callback needed for this path now; P0.04 completes its lease/recovery behavior. Do not create a disposable synchronous or unauthenticated worker path.
+- [x] **P0.03-T4** Build receipt/status, per-file validation failure, camera-denied/file-picker alternative and expired-image refresh-once behavior. Introduce temporary deletion tasks; cancel rejects access and rechecks raw keys after PUT expiry.
 
 Acceptance:
 

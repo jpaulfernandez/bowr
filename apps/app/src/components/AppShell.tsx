@@ -40,7 +40,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-current={current ? 'page' : undefined}
             className={`min-h-target justify-center rounded-control px-3 py-2 ${rail ? '' : 'flex-1 items-center'} ${current ? 'bg-accent-soft' : ''}`}
           >
-            <Text className={`${rail ? 'text-body' : 'text-compact'} ${current ? 'text-accent underline' : 'text-text'}`}>
+            <Text className={`${rail ? 'text-body' : 'text-compact text-center'} ${current ? 'text-accent underline' : 'text-text'}`}>
               {item.label}
             </Text>
           </Link>

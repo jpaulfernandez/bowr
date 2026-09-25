@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "export:web": "node scripts/export-web.mjs",
     "serve:web": "node scripts/serve-web.mjs",
-    "check:web": "node scripts/check-web-bundle.mjs"
+    "check:web": "node scripts/check-web-bundle.mjs",
+    "lint:classes": "node scripts/check-classnames.mjs"
   },
   "dependencies": {
     "@bowr/contracts": "workspace:*",

@@ -36,10 +36,11 @@ select ok(not has_function_privilege('anon', 'public.update_profile(uuid, bigint
 
 -- Allowlist of anon/authenticated grants in public: fail when a new object is exposed silently.
 select is(
-  (select coalesce(array_agg(format('%s:%s:%s', grantee, table_name, privilege_type) order by 1), '{}')
+  (select coalesce(array_agg(g order by g), '{}') from (select format('%s:%s:%s', grantee, table_name, privilege_type) as g
      from information_schema.role_table_grants
-    where table_schema = 'public' and grantee in ('anon', 'authenticated')),
-  '{}'::text[], 'no table-wide grants to anon/authenticated in public');
+    where table_schema = 'public' and grantee in ('anon', 'authenticated')) grants),
+  array['authenticated:media_assets:SELECT', 'authenticated:upload_batches:SELECT', 'authenticated:upload_entries:SELECT'],
+  'table-wide grants to anon/authenticated in public are exactly the owner-filtered reads');
 select is(
   (select array_agg(p.proname::text order by p.proname)
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace

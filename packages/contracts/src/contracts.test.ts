@@ -19,6 +19,7 @@ describe('Bootstrap', () => {
       membership: { state: 'pending', role: null },
       profile: null,
       pending_expires_at: '2026-09-26T08:00:00+00:00',
+      upload_limits: null,
     });
     expect(parsed.profile).toBeNull();
   });
@@ -30,6 +31,7 @@ describe('Bootstrap', () => {
         membership: { state: 'admin', role: null },
         profile: null,
         pending_expires_at: null,
+        upload_limits: null,
       }).success,
     ).toBe(false);
   });
