@@ -1,6 +1,7 @@
 // Scheduled maintenance, called by pg_cron through pg_net with a machine secret.
 // There is no user-facing route here and user JWTs are not accepted.
 import { serviceClient } from '../_shared/service.ts';
+import { runDiagnostic } from '../_shared/ai-gateway.ts';
 import { dispatchRunnable } from '../_shared/dispatch.ts';
 import { deleteObject } from '../_shared/storage.ts';
 
@@ -69,7 +70,26 @@ async function dispatchJobs() {
   return { ...summary, stuck: (stuck ?? []).length };
 }
 
+async function aiRollover() {
+  const { data, error } = await serviceClient().rpc('svc_ai_rollover', {});
+  if (error) throw new Error(`rollover failed: ${error.code}`);
+  return { holds_created: (data as { holds_created: number }).holds_created };
+}
+
+/** Operator-only guarded smoke call through the same gateway and budget. */
+async function aiDiagnostic() {
+  const outcome = await runDiagnostic(`operator-diagnostic:${crypto.randomUUID()}`, null);
+  console.log(JSON.stringify({ event: 'ai_diagnostic', status: outcome.status }));
+  return {
+    completed: outcome.status === 'completed' ? 1 : 0,
+    settled_micros: 'settled_micros' in outcome ? outcome.settled_micros : 0,
+    refused: outcome.status === 'refused' ? 1 : 0,
+  };
+}
+
 const tasks: Record<string, () => Promise<Record<string, number>>> = {
+  ai_rollover: aiRollover,
+  ai_diagnostic: aiDiagnostic,
   dispatch_jobs: dispatchJobs,
   pending_account_cleanup: pendingAccountCleanup,
   media_deletion: mediaDeletion,

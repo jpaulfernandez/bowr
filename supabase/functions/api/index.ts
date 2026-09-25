@@ -1,4 +1,5 @@
 // Public Edge API: https://<project>.supabase.co/functions/v1/api/v1/...
+import { aiEnabled, runDiagnostic } from '../_shared/ai-gateway.ts';
 import { requireCaller } from '../_shared/auth.ts';
 import { appError, errorResponse, fromDatabaseError, json, preflight } from '../_shared/http.ts';
 import { afterResponse, dispatchJob } from '../_shared/dispatch.ts';
@@ -19,6 +20,12 @@ async function callService(name: string, args: Record<string, unknown>): Promise
   return data;
 }
 
+/** Shared budget mode and reset time; no other member's usage. */
+async function aiStatus() {
+  const status = (await callService('svc_ai_status', {})) as { mode: string; resets_at: string };
+  return { status: aiEnabled() ? status.mode : 'unavailable', resets_at: status.resets_at };
+}
+
 const heicEnabled = () => Deno.env.get('UPLOAD_HEIC_ENABLED') === 'true';
 const uploadFormats =
   () => ['image/jpeg', 'image/png', 'image/webp', ...(heicEnabled() ? ['image/heic', 'image/heif'] : [])];
@@ -27,9 +34,14 @@ route('GET', /^\/v1\/bootstrap$/, async ({ req, requestId }) => {
   const { db } = await requireCaller(req);
   const { data, error } = await db.rpc('get_bootstrap');
   if (error) throw fromDatabaseError(error);
-  const bootstrap = data as { membership: { state: string }; upload_limits?: Record<string, unknown> | null };
+  const bootstrap = data as {
+    membership: { state: string };
+    upload_limits?: Record<string, unknown> | null;
+    ai?: unknown;
+  };
   // Limits come from the server so UI copy cannot drift from what is enforced.
   if (bootstrap.upload_limits) bootstrap.upload_limits = { ...bootstrap.upload_limits, formats: uploadFormats() };
+  bootstrap.ai = bootstrap.membership.state === 'active' ? await aiStatus() : null;
   return json(req, requestId, 200, bootstrap);
 });
 
@@ -250,6 +262,60 @@ route('DELETE', /^\/v1\/account\/pending$/, async ({ req, requestId }) => {
   const { error } = await serviceClient().auth.admin.deleteUser(userId);
   // A failed Auth deletion stays in the deleting state and is retried by cleanup.
   return json(req, requestId, 202, { status: error ? 'pending' : 'deleted' });
+});
+
+route('GET', /^\/v1\/budget-status$/, async ({ req, requestId }) => {
+  const { db } = await requireCaller(req);
+  const { data, error } = await db.rpc('get_bootstrap');
+  if (error) throw fromDatabaseError(error);
+  if ((data as { membership: { state: string } }).membership.state !== 'active') {
+    throw appError(403, 'MEMBERSHIP_INACTIVE');
+  }
+  return json(req, requestId, 200, await aiStatus());
+});
+
+route('GET', /^\/v1\/admin\/budget$/, async ({ req, requestId }) => {
+  const { userId } = await requireCaller(req);
+  const budget = (await callService('svc_admin_budget', { p_actor_id: userId })) as Record<string, unknown>;
+  return json(req, requestId, 200, { ...budget, ai_enabled: aiEnabled() });
+});
+
+route('PATCH', /^\/v1\/admin\/budget$/, async ({ req, requestId }) => {
+  const { userId } = await requireCaller(req);
+  const key = idempotencyKey(req);
+  const body = await jsonBody(req, [
+    'expected_revision',
+    'lighter_micros',
+    'stop_micros',
+    'ceiling_micros',
+    'clear_pause',
+  ]);
+  for (const field of ['expected_revision', 'lighter_micros', 'stop_micros', 'ceiling_micros']) {
+    if (!Number.isSafeInteger(body[field])) throw appError(422, 'VALIDATION_FAILED', { field });
+  }
+  return json(
+    req,
+    requestId,
+    200,
+    await callService('svc_admin_update_budget', {
+      p_actor_id: userId,
+      p_request_id: key,
+      p_expected_revision: body.expected_revision,
+      p_lighter_micros: body.lighter_micros,
+      p_stop_micros: body.stop_micros,
+      p_ceiling_micros: body.ceiling_micros,
+      p_clear_pause: body.clear_pause === true,
+    }),
+  );
+});
+
+route('POST', /^\/v1\/admin\/ai-diagnostic$/, async ({ req, requestId }) => {
+  const { userId } = await requireCaller(req);
+  const key = idempotencyKey(req);
+  await callService('svc_admin_budget', { p_actor_id: userId });
+  // The request identity is the attempt identity: a retry never sends a second call.
+  const outcome = await runDiagnostic(`diagnostic:${userId}:${key}`, userId);
+  return json(req, requestId, 200, outcome);
 });
 
 route('GET', /^\/v1\/admin\/overview$/, async ({ req, requestId }) => {

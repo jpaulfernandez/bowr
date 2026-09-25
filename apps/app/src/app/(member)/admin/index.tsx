@@ -6,6 +6,7 @@ import { Button } from '../../../components/Button';
 import { Screen } from '../../../components/Screen';
 import { Heading, Text } from '../../../components/Text';
 import { AdminInvites, adminOverviewKey } from '../../../features/admin/AdminInvites';
+import { AdminSpend } from '../../../features/admin/AdminSpend';
 import { apiRequest } from '../../../lib/api';
 import { formatDate } from '../../../lib/format';
 import { useSession } from '../../../lib/session';
@@ -22,13 +23,14 @@ export default function Admin() {
   });
 
   return (
-    <Screen title="Admin" subtitle="Members and invites">
+    <Screen title="Admin" subtitle="AI spend, members and invites">
       {overview.isPending ? <Text variant="secondary">Loading administration</Text> : null}
       {overview.isError ? (
         <Banner tone="error" message="Administration couldn't load.">
           <Button label="Try again" variant="secondary" onPress={() => void overview.refetch()} />
         </Banner>
       ) : null}
+      {userId ? <AdminSpend userId={userId} /> : null}
       {overview.data && userId ? (
         <View className="gap-8">
           <View className="gap-4">

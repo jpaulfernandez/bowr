@@ -7,7 +7,7 @@
     "node": ">=22.12 <23"
   },
   "scripts": {
-    "check": "pnpm lint && pnpm typecheck && pnpm test:unit && pnpm worker:test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test:unit && pnpm test:functions && pnpm worker:test",
     "lint": "eslint . && pnpm --filter @bowr/app lint:classes && pnpm lint:functions && pnpm worker:lint",
     "lint:functions": "cd supabase/functions && deno lint && deno fmt --check",
     "typecheck": "pnpm -r --parallel run typecheck && pnpm typecheck:functions",
@@ -26,7 +26,10 @@
     "contracts:generate": "UPDATE_CONTRACTS=1 vitest run --project packages generated-contracts",
     "storage:start": "docker compose -f infra/local/compose.yaml up -d && node scripts/dev/setup-storage.mjs",
     "storage:stop": "docker compose -f infra/local/compose.yaml down",
-    "worker:serve": "cd services/worker && uv run python -m bowr_worker.local_server"
+    "worker:serve": "cd services/worker && uv run python -m bowr_worker.local_server",
+    "fake-ai:serve": "node scripts/dev/fake-gemini.mjs",
+    "ops:ai-smoke": "node scripts/ops/ai-smoke.mjs",
+    "test:functions": "deno test --config supabase/functions/deno.json supabase/functions/_shared"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

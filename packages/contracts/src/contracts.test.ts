@@ -20,6 +20,7 @@ describe('Bootstrap', () => {
       profile: null,
       pending_expires_at: '2026-09-26T08:00:00+00:00',
       upload_limits: null,
+      ai: null,
     });
     expect(parsed.profile).toBeNull();
   });
@@ -32,6 +33,7 @@ describe('Bootstrap', () => {
         profile: null,
         pending_expires_at: null,
         upload_limits: null,
+        ai: null,
       }).success,
     ).toBe(false);
   });

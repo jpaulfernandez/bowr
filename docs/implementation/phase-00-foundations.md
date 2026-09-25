@@ -94,10 +94,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P0.05-T1** Add budget periods, per-attempt `ai_usage`, cross-period holds and atomic reservation/dispatch/settlement functions in integer USD micros. Enforce lighter/stop/ceiling ordering and defaults $8/$9.50/$10, with UTC month reset.
-- [ ] **P0.05-T2** Implement the internal-only AI gateway: server task aliases, counted inputs, bounded billed output/thinking, effective-dated prices, schema validation, unique attempts, and no direct worker/client provider access. Unknown price/bound/accounting state fails closed.
-- [ ] **P0.05-T3** Implement uncertain dispatch holds, separately reserved explicit retry/repair, cancellation settlement, chronological period locks, rollover holds and tariff recheck before dispatch. An actual charge above reservation pauses AI and alerts.
-- [ ] **P0.05-T4** Build admin spend actual/reserved/unknown/task/member summaries and deliberate revisioned threshold changes. Bootstrap/member status supplies mode and local reset time without others' usage; normal/lighter/paused/provider-error states are distinct.
+- [x] **P0.05-T1** Add budget periods, per-attempt `ai_usage`, cross-period holds and atomic reservation/dispatch/settlement functions in integer USD micros. Enforce lighter/stop/ceiling ordering and defaults $8/$9.50/$10, with UTC month reset.
+- [x] **P0.05-T2** Implement the internal-only AI gateway: server task aliases, counted inputs, bounded billed output/thinking, effective-dated prices, schema validation, unique attempts, and no direct worker/client provider access. Unknown price/bound/accounting state fails closed.
+- [x] **P0.05-T3** Implement uncertain dispatch holds, separately reserved explicit retry/repair, cancellation settlement, chronological period locks, rollover holds and tariff recheck before dispatch. An actual charge above reservation pauses AI and alerts.
+- [x] **P0.05-T4** Build admin spend actual/reserved/unknown/task/member summaries and deliberate revisioned threshold changes. Bootstrap/member status supplies mode and local reset time without others' usage; normal/lighter/paused/provider-error states are distinct.
 - [ ] **P0.05-T5** Verify real paid Gemini project, current approved model IDs/prices, output bounds, billing period and available cap/prepaid settings; record configuration, disable automatic top-up where supported. Add budget-mode analytics using only allowed fields. The test runner stays operator-only.
 
 Acceptance:

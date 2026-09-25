@@ -39,8 +39,9 @@ export default function Privacy() {
         </Text>
         <Heading level={2}>Not collected yet</Heading>
         <Text>
-          bowr does not yet send anything to an AI provider or record usage analytics. This page will change before
-          either is turned on.
+          bowr does not yet send your photos or anything you type to an AI provider, and it does not record usage
+          analytics. The owner can run a diagnostic that sends one fixed test sentence with no personal content. This
+          page will change before AI features or analytics are turned on.
         </Text>
       </Prose>
     </Screen>

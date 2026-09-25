@@ -4,10 +4,20 @@
     "noUncheckedIndexedAccess": true
   },
   "lint": {
-    "rules": { "tags": ["recommended"] }
+    "rules": {
+      "tags": [
+        "recommended"
+      ]
+    },
+    "exclude": [
+      "_shared/generated/"
+    ]
   },
   "fmt": {
     "lineWidth": 120,
-    "singleQuote": true
+    "singleQuote": true,
+    "exclude": [
+      "_shared/generated/"
+    ]
   }
 }

@@ -9,7 +9,7 @@ const entries: Array<{ href: Href; label: string; description: string }> = [
 ];
 
 const ownerEntries: typeof entries = [
-  { href: '/admin', label: 'Admin', description: 'Members and invites' },
+  { href: '/admin', label: 'Admin', description: 'AI spend, members and invites' },
 ];
 
 export default function More() {

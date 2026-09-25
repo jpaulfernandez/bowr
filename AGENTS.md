@@ -116,12 +116,13 @@ Run from the repository root. Prerequisites: Node 22, pnpm 10, uv, Docker. Setup
 | Lint | `pnpm lint` (ESLint, `deno lint`/`fmt --check` for Edge Functions, ruff) |
 | Type-check | `pnpm typecheck` (app, packages, Edge Functions via `deno check`) |
 | Unit tests (Vitest) | `pnpm test:unit` |
-| Local stack | `pnpm db:start` then `pnpm storage:start` (R2 stand-in) and `pnpm worker:serve` (worker); stop with `pnpm storage:stop` / `pnpm db:stop` |
+| Local stack | `pnpm db:start` then `pnpm storage:start` (R2 stand-in) `pnpm worker:serve` (worker) and `pnpm fake-ai:serve` (deterministic Gemini stand-in); stop with `pnpm storage:stop` / `pnpm db:stop` |
 | Migration reset | `pnpm db:reset` |
 | Database tests (pgTAP) | `pnpm test:db` |
 | Integration tests (races, Edge API) | `pnpm test:integration` (needs `pnpm db:start`) |
 | Web export + bundle inspection | `pnpm build:web` |
 | E2E (Playwright + axe) | `pnpm build:web && pnpm test:e2e` |
+| Edge unit tests (Deno) | `pnpm test:functions` |
 | Worker tests (pytest) | `pnpm worker:test` |
 | Regenerate worker JSON contracts | `pnpm contracts:generate` (drift fails `pnpm test:unit`) |
 | Owner bootstrap (operator) | `DATABASE_URL=... pnpm ops:bootstrap-owner --user-id <uuid>` |

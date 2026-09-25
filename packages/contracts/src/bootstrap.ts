@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AiStatus } from './budget';
 import { UploadLimits } from './uploads';
 
 export const MembershipState = z.enum(['pending', 'active', 'suspended', 'deleting']);
@@ -30,6 +31,8 @@ export const Bootstrap = z.object({
   pending_expires_at: z.string().nullable(),
   /** Enforced upload limits for active members; null for other states. */
   upload_limits: UploadLimits.nullable(),
+  /** Shared AI budget mode and reset time for active members; null otherwise. */
+  ai: AiStatus.nullable(),
 });
 export type Bootstrap = z.infer<typeof Bootstrap>;
 

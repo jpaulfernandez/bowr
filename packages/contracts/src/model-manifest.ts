@@ -20,9 +20,15 @@ const Task = z
     output_schema_version: z.number().int().positive(),
     max_input_tokens: z.number().int().positive(),
     max_output_tokens: z.number().int().positive(),
+    // Only a verified, bounded thinking budget may be enabled; otherwise disabled.
+    thinking: z.union([z.literal('disabled'), z.object({ budget_tokens: z.number().int().positive() }).strict()]),
+    safety_margin_percent: z.number().int().min(0).max(100),
+    // Envelope used from the lighter-mode threshold up to the operational stop.
+    lighter: z.object({ model: z.string().min(1).max(100), max_output_tokens: z.number().int().positive() }).strict(),
     prices: z.array(Price).min(1),
   })
-  .strict();
+  .strict()
+  .refine((task) => task.lighter.max_output_tokens <= task.max_output_tokens, 'lighter output must not exceed normal output');
 
 const LocalModel = z
   .object({

@@ -1,11 +1,33 @@
 # Pinned model manifest (ARCHITECTURE sections 3.1 and 10.1).
-# Validated by packages/contracts/src/model-manifest.ts. Clients never choose
-# models, prompts or prices; the server reads task aliases from this file.
+# Validated by packages/contracts/src/model-manifest.ts and generated into
+# supabase/functions/_shared/generated/ai-catalog.json (pnpm contracts:generate).
+# Clients never choose models, prompts or prices; the gateway reads task aliases
+# from this file.
+#
+# Prices are integer USD micros per million tokens ($1 = 1,000,000). They come
+# from ARCHITECTURE section 10.1 and MUST be re-verified against Google's current
+# price list before AI is enabled in any environment (P0.05-T5 gate). Output
+# billing includes thinking tokens.
 schema_version: 1
 
-# Generative task aliases, invoked only through the budget-gated AI gateway.
-# Entries are added by P0.05 after the paid-provider verification gate.
-tasks: {}
+tasks:
+  # Synthetic, content-free call used to prove the budget guard end to end.
+  diagnostic:
+    provider: gemini
+    model: gemini-3.1-flash-lite
+    prompt_version: diagnostic-v1
+    output_schema_version: 1
+    max_input_tokens: 200
+    max_output_tokens: 64
+    thinking: disabled
+    safety_margin_percent: 10
+    lighter:
+      model: gemini-3.1-flash-lite
+      max_output_tokens: 32
+    prices:
+      - effective_from: "2026-01-01"
+        input_per_mtok_micros: 250000
+        output_per_mtok_micros: 1500000
 
 # Local models baked into the worker image. Each entry pins a revision and the
 # SHA-256 of the weights; nothing is downloaded at runtime.

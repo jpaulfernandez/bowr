@@ -63,3 +63,14 @@ The migration schedules `bowr-pending-account-cleanup` hourly. If either Vault s
 3. Deploy the worker with `cd services/worker && uv run --extra modal modal deploy modal_app.py`. Create a Modal proxy-auth token for the `wake` endpoint, then set `WORKER_DISPATCH_*` in the Edge secrets.
 4. Upload each MEDIA fixture through the deployed path (JPEG with EXIF orientation and GPS, PNG, WebP, HEIC, spoofed MIME, animated, over-limit). Confirm the outcomes match `supabase/tests/integration/p0_03_uploads.test.ts`. Set `UPLOAD_HEIC_ENABLED=true` only after the HEIC case passes on Modal.
 5. Record the R2 location hint and Modal region in this file. They are not guarantees of processing location.
+
+## AI gateway (P0.05)
+
+| Name | Where it lives | Used by |
+| --- | --- | --- |
+| `AI_ENABLED` | Edge Function secrets | Must stay `false` until the P0.05-T5 verification passes |
+| `GEMINI_API_KEY` | Edge Function secrets | Dedicated bowr paid project only |
+| `GEMINI_BASE_URL` | Edge Function secrets (local only) | Points the SDK at `scripts/dev/fake-gemini.mjs`; unset in staging/production |
+| `AI_CALL_TIMEOUT_MS` | Edge Function secrets (optional) | Provider call timeout; defaults to 30 s |
+
+Verification before enabling AI (P0.05-T5): confirm the model IDs and effective prices in `config/models.yaml` against Google's current pricing page. Set the Google project cap to $10 and disable automatic top-up where the billing account supports it. Run `SUPABASE_URL=... MAINTENANCE_SECRET=... pnpm ops:ai-smoke` once, then reconcile Google's usage report against `private.ai_usage`.
