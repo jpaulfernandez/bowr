@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "bowr",
+    "slug": "bowr",
+    "version": "0.0.0",
+    "scheme": "bowr",
+    "orientation": "default",
+    "userInterfaceStyle": "light",
+    "web": {
+      "output": "single",
+      "bundler": "metro",
+      "lang": "en",
+      "name": "bowr",
+      "shortName": "bowr",
+      "themeColor": "#F6F7FB",
+      "backgroundColor": "#F6F7FB"
+    },
+    "plugins": ["expo-router", "expo-image", "expo-web-browser"]
+  }
+}

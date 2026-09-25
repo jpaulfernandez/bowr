@@ -1,0 +1,61 @@
+-- AUTH fixture (test-strategy.md): identities for access tests.
+-- Include inside a test transaction with: \ir ../fixtures/auth.psql
+create schema if not exists tests;
+
+create or replace function tests.create_identity(p_label text, p_state text default 'active', p_role text default 'member')
+returns uuid
+language plpgsql
+as $$
+declare
+  v_id uuid := gen_random_uuid();
+begin
+  insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
+    raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+  values (v_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+    p_label || '-' || substr(v_id::text, 1, 8) || '@example.test', '', now(),
+    '{"provider":"email","providers":["email"]}', '{}', now(), now());
+
+  update private.memberships set
+    state = p_state,
+    role = p_role,
+    joined_at = case when p_state in ('active', 'suspended') then now() end,
+    suspended_at = case when p_state = 'suspended' then now() end,
+    deleting_at = case when p_state = 'deleting' then now() end
+  where user_id = v_id;
+  return v_id;
+end;
+$$;
+
+create or replace function tests.authenticate_as(p_user_id uuid)
+returns void
+language plpgsql
+as $$
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', p_user_id, 'role', 'authenticated', 'aud', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+end;
+$$;
+
+create or replace function tests.authenticate_anon()
+returns void
+language plpgsql
+as $$
+begin
+  perform set_config('request.jwt.claims', json_build_object('role', 'anon')::text, true);
+  perform set_config('role', 'anon', true);
+end;
+$$;
+
+create or replace function tests.clear_authentication()
+returns void
+language plpgsql
+as $$
+begin
+  perform set_config('role', 'postgres', true);
+  perform set_config('request.jwt.claims', '', true);
+end;
+$$;
+
+grant usage on schema tests to anon, authenticated;
+grant execute on all functions in schema tests to anon, authenticated;

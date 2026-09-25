@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Web-only accessibility behavior (DESIGN sections 9.2 and 10). */
+:focus-visible {
+  outline: 2px solid #3e4db6;
+  outline-offset: 2px;
+}
+html {
+  scroll-padding-bottom: 96px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

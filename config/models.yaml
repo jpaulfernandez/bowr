@@ -1,0 +1,12 @@
+# Pinned model manifest (ARCHITECTURE sections 3.1 and 10.1).
+# Validated by packages/contracts/src/model-manifest.ts. Clients never choose
+# models, prompts or prices; the server reads task aliases from this file.
+schema_version: 1
+
+# Generative task aliases, invoked only through the budget-gated AI gateway.
+# Entries are added by P0.05 after the paid-provider verification gate.
+tasks: {}
+
+# Local models baked into the worker image. Each entry pins a revision and the
+# SHA-256 of the weights; nothing is downloaded at runtime.
+local_models: {}

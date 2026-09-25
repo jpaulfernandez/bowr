@@ -18,10 +18,10 @@ The original one-week estimate is high risk. P0.04 establishes the first measure
 
 Tasks:
 
-- [ ] **P0.01-T1** Scaffold the pnpm Expo/TypeScript workspace, shared contracts/domain/tokens, local Supabase and Python/uv worker skeleton. Pin compatible tool/runtime versions, lockfiles, model manifest format and `.env.example` names without secrets. Document setup and create test/build scripts from the shared strategy.
-- [ ] **P0.01-T2** Add profiles and private memberships, a minimal Auth trigger, fixed-authority owner bootstrap command, RLS/grants, hardened membership helper and revisioned/idempotent `update_profile`. Add same-owner conventions and initial AUTH fixtures.
-- [ ] **P0.01-T3** Implement `/`, `/auth`, `/auth/check-email`, `/auth/callback`, `/invite`, `/privacy`, `/wardrobe`, `/more`, `/settings` and safe bootstrap. Build public/pending/member/owner layouts and only available navigation; use DESIGN tokens, React Native primitives and platform adapters. Outfits/Strut become actionable in phase 2.
-- [ ] **P0.01-T4** Add tab-scoped auth storage, user-scoped query keys, pending/error rendering and account-change cancellation/cache disposal. Configure SPA export/deep-link rewrites, restrictive tested headers, no private service-worker cache, and web manifest.
+- [x] **P0.01-T1** Scaffold the pnpm Expo/TypeScript workspace, shared contracts/domain/tokens, local Supabase and Python/uv worker skeleton. Pin compatible tool/runtime versions, lockfiles, model manifest format and `.env.example` names without secrets. Document setup and create test/build scripts from the shared strategy.
+- [x] **P0.01-T2** Add profiles and private memberships, a minimal Auth trigger, fixed-authority owner bootstrap command, RLS/grants, hardened membership helper and revisioned/idempotent `update_profile`. Add same-owner conventions and initial AUTH fixtures.
+- [x] **P0.01-T3** Implement `/`, `/auth`, `/auth/check-email`, `/auth/callback`, `/invite`, `/privacy`, `/wardrobe`, `/more`, `/settings` and safe bootstrap. Build public/pending/member/owner layouts and only available navigation; use DESIGN tokens, React Native primitives and platform adapters. Outfits/Strut become actionable in phase 2.
+- [x] **P0.01-T4** Add tab-scoped auth storage, user-scoped query keys, pending/error rendering and account-change cancellation/cache disposal. Configure SPA export/deep-link rewrites, restrictive tested headers, no private service-worker cache, and web manifest.
 
 Acceptance:
 
