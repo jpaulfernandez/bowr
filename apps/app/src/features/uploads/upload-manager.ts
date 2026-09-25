@@ -97,6 +97,21 @@ export const uploadManager = {
     emit();
     pump();
   },
+  /** A file chosen again for a slot that never finished uploading (for example after the tab closed). */
+  reselect(entryId: string, picked: { file: File; name: string }) {
+    tasks.get(entryId)?.xhr?.abort();
+    tasks.set(entryId, {
+      entryId,
+      name: picked.name,
+      file: picked.file,
+      upload: null,
+      completeKey: crypto.randomUUID(),
+      status: 'queued',
+      progress: 0,
+    });
+    emit();
+    pump();
+  },
   retry(entryId: string) {
     const task = tasks.get(entryId);
     if (task && task.status === 'failed') {

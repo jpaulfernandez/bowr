@@ -9,7 +9,7 @@ export const UploadLimits = z.object({
 });
 export type UploadLimits = z.infer<typeof UploadLimits>;
 
-export const EntryState = z.enum(['awaiting_upload', 'uploaded', 'validating', 'ready', 'rejected', 'canceled']);
+export const EntryState = z.enum(['awaiting_upload', 'uploaded', 'validating', 'ready', 'rejected', 'failed', 'canceled']);
 export type EntryState = z.infer<typeof EntryState>;
 
 export const SignedUpload = z.object({

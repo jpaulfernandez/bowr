@@ -11,6 +11,7 @@ import hmac
 import json
 import logging
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -24,6 +25,10 @@ INTERNAL_API = os.environ.get("BOWR_INTERNAL_API_URL", "http://127.0.0.1:54321/f
 DISPATCH_KEY = os.environ.get("WORKER_DISPATCH_KEY", "local-worker-key")
 DISPATCH_SECRET = os.environ.get("WORKER_DISPATCH_SECRET", "local-only-worker-dispatch-secret-0123456789")
 PORT = int(os.environ.get("BOWR_WORKER_PORT", "8765"))
+HEARTBEAT_SECONDS = float(os.environ.get("BOWR_WORKER_HEARTBEAT_SECONDS", "15"))
+# Development only: hold each claimed job before processing, so recovery tests can
+# stop a worker mid-stage. Never set in the Modal deployment.
+STAGE_DELAY_SECONDS = float(os.environ.get("BOWR_WORKER_STAGE_DELAY_SECONDS", "0"))
 
 # At most two concurrent processing jobs (ARCHITECTURE section 9.2).
 executor = ThreadPoolExecutor(max_workers=2)
@@ -33,7 +38,13 @@ log = logging.getLogger("bowr_worker")
 
 def _process(wake: dict) -> None:
     try:
-        run_job(wake, INTERNAL_API, client)
+        run_job(
+            wake,
+            INTERNAL_API,
+            client,
+            heartbeat_seconds=HEARTBEAT_SECONDS,
+            before_process=(lambda: time.sleep(STAGE_DELAY_SECONDS)) if STAGE_DELAY_SECONDS > 0 else None,
+        )
     except Exception:
         # The durable job stays claimable after its lease; details are not logged.
         log.exception("job %s failed", wake.get("job_id"))

@@ -97,3 +97,78 @@ def test_refused_claim_does_no_work() -> None:
     with httpx.Client(transport=fake_transport(b"", calls, claim_status=403)) as client:
         assert run_job(WAKE, API, client) == "claim_refused"
     assert [call.url.path for call in calls] == ["/v1/jobs/claim"]
+
+
+def lease_transport(
+    calls: list[httpx.Request], heartbeat: str = "renewed", put_status: int = 200
+) -> httpx.MockTransport:
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        path = request.url.path
+        if path == "/v1/jobs/claim":
+            return httpx.Response(200, json=claim_body())
+        if path == "/source":
+            return httpx.Response(200, content=encode(two_tone(), "PNG"))
+        if path.startswith("/output"):
+            return httpx.Response(put_status)
+        if path.endswith("/heartbeat"):
+            if heartbeat == "renewed":
+                return httpx.Response(
+                    200,
+                    json={
+                        "data": {
+                            "status": "renewed",
+                            "lease_expires_at": "2026-09-25T10:02:00Z",
+                            "capability": "renewed-capability-token-value",
+                            "output": {
+                                "url": f"http://store.test/output-renewed?{SIGNED}",
+                                "content_type": "image/webp",
+                            },
+                        }
+                    },
+                )
+            return httpx.Response(200, json={"data": {"status": heartbeat}})
+        if path.endswith(("/complete", "/fail")):
+            return httpx.Response(200, json={"data": {"status": "applied"}})
+        return httpx.Response(500)
+
+    return httpx.MockTransport(handler)
+
+
+def test_heartbeats_renew_the_capability_and_output_url() -> None:
+    calls: list[httpx.Request] = []
+    with httpx.Client(transport=lease_transport(calls)) as client:
+        outcome = run_job(
+            WAKE, API, client, heartbeat_seconds=0.05, before_process=lambda: __import__("time").sleep(0.3)
+        )
+    assert outcome == "ready:applied"
+    paths = [call.url.path for call in calls]
+    assert "/output-renewed" in paths, "the renewed output URL is used"
+    complete = next(call for call in calls if call.url.path.endswith("/complete"))
+    assert complete.headers["authorization"] == "Bearer renewed-capability-token-value"
+
+
+def test_a_refused_heartbeat_abandons_the_attempt_without_writing() -> None:
+    calls: list[httpx.Request] = []
+    with httpx.Client(transport=lease_transport(calls, heartbeat="stale")) as client:
+        outcome = run_job(
+            WAKE, API, client, heartbeat_seconds=0.05, before_process=lambda: __import__("time").sleep(0.3)
+        )
+    assert outcome == "lease_lost"
+    paths = [call.url.path for call in calls]
+    assert not any(p.startswith("/output") for p in paths)
+    assert not any(p.endswith(("/complete", "/fail")) for p in paths)
+
+
+def test_a_storage_failure_is_reported_as_transient() -> None:
+    calls: list[httpx.Request] = []
+    with httpx.Client(transport=lease_transport(calls, put_status=503)) as client:
+        outcome = run_job(WAKE, API, client)
+    assert outcome.startswith("failed:TRANSIENT_STORAGE")
+    fail = next(call for call in calls if call.url.path.endswith("/fail"))
+    assert json.loads(fail.content) == {
+        "schema_version": 1,
+        "lease_generation": 1,
+        "failure_code": "TRANSIENT_STORAGE",
+    }
+    assert not any(call.url.path.endswith("/complete") for call in calls)

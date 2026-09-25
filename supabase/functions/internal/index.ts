@@ -1,13 +1,14 @@
 // Internal worker API: .../functions/v1/internal/v1/...
 // Accepts only single-use claim tokens and job-scoped capabilities, never user JWTs.
 import { sha256Hex, signCapability, verifyCapability } from '../_shared/capability.ts';
-import { afterResponse } from '../_shared/dispatch.ts';
+import { afterResponse, dispatchRunnable } from '../_shared/dispatch.ts';
 import { appError, errorResponse, fromDatabaseError, json } from '../_shared/http.ts';
 import { serviceClient } from '../_shared/service.ts';
 import { deleteObject, getObject, presignGet, presignPut } from '../_shared/storage.ts';
 import { isUuid, jsonBody } from '../_shared/validate.ts';
 
 const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
+const TRANSIENT_CODES = new Set(['TRANSIENT_STORAGE', 'WORKER_ERROR', 'DEADLINE_EXCEEDED']);
 const FAILURE_CODES = new Set([
   'UNSUPPORTED_MEDIA',
   'MEDIA_TYPE_MISMATCH',
@@ -71,13 +72,58 @@ function isWebp(bytes: Uint8Array): boolean {
   return bytes.length > 12 && ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP';
 }
 
-async function complete(req: Request, requestId: string, jobId: string): Promise<Response> {
+/** The capability must name this job and the lease generation the body claims. */
+async function jobCapability(req: Request, jobId: string, body: Record<string, unknown>) {
   const capability = await verifyCapability(/^Bearer (.+)$/.exec(req.headers.get('Authorization') ?? '')?.[1]);
-  if (!capability || capability.job_id !== jobId) throw appError(403, 'CAPABILITY_REJECTED');
-  const body = await jsonBody(req, ['schema_version', 'lease_generation', 'outcome', 'output', 'failure_code']);
-  if (body.schema_version !== 1 || body.lease_generation !== capability.lease_generation) {
+  if (
+    !capability || capability.job_id !== jobId || capability.stage !== 'validate_upload' ||
+    body.schema_version !== 1 || body.lease_generation !== capability.lease_generation
+  ) {
     throw appError(403, 'CAPABILITY_REJECTED');
   }
+  return capability;
+}
+
+async function heartbeat(req: Request, requestId: string, jobId: string): Promise<Response> {
+  const body = await jsonBody(req, ['schema_version', 'lease_generation']);
+  const capability = await jobCapability(req, jobId, body);
+  const result =
+    (await rpc('svc_heartbeat_job', { p_job_id: jobId, p_lease_generation: capability.lease_generation })) as {
+      status: 'renewed' | 'stale' | 'deadline_exceeded';
+      lease_expires_at?: string;
+    };
+  if (result.status !== 'renewed' || !result.lease_expires_at) {
+    return json(req, requestId, 200, { status: result.status });
+  }
+  const seconds = (Date.parse(result.lease_expires_at) - Date.now()) / 1000;
+  // A renewed lease gets a fresh capability and output URL with the new expiry.
+  return json(req, requestId, 200, {
+    status: 'renewed',
+    lease_expires_at: result.lease_expires_at,
+    capability: await signCapability({ ...capability, exp: Math.floor(Date.parse(result.lease_expires_at) / 1000) }),
+    output: { url: await presignPut(capability.output_key, 'image/webp', seconds), content_type: 'image/webp' },
+  });
+}
+
+async function fail(req: Request, requestId: string, jobId: string): Promise<Response> {
+  const body = await jsonBody(req, ['schema_version', 'lease_generation', 'failure_code']);
+  const capability = await jobCapability(req, jobId, body);
+  if (typeof body.failure_code !== 'string' || !TRANSIENT_CODES.has(body.failure_code)) {
+    throw appError(422, 'VALIDATION_FAILED', { field: 'failure_code' });
+  }
+  const result = await rpc('svc_fail_job_attempt', {
+    p_job_id: jobId,
+    p_lease_generation: capability.lease_generation,
+    p_failure_code: body.failure_code,
+  });
+  // A freed processing slot lets the next runnable job start without waiting.
+  afterResponse(dispatchRunnable(5));
+  return json(req, requestId, 200, result);
+}
+
+async function complete(req: Request, requestId: string, jobId: string): Promise<Response> {
+  const body = await jsonBody(req, ['schema_version', 'lease_generation', 'outcome', 'output', 'failure_code']);
+  const capability = await jobCapability(req, jobId, body);
 
   let output: Record<string, unknown> | null = null;
   if (body.outcome === 'ready') {
@@ -122,6 +168,7 @@ async function complete(req: Request, requestId: string, jobId: string): Promise
     });
     afterResponse(deleteObject(capability.output_key));
   }
+  afterResponse(dispatchRunnable(5));
   return json(req, requestId, 200, result);
 }
 
@@ -130,9 +177,10 @@ Deno.serve(async (req) => {
   try {
     const path = new URL(req.url).pathname.replace(/^.*?\/internal(?=\/v1\/)/, '');
     if (req.method === 'POST' && path === '/v1/jobs/claim') return await claim(req, requestId);
-    const completeMatch = /^\/v1\/jobs\/([^/]+)\/complete$/.exec(path);
-    if (req.method === 'POST' && completeMatch && isUuid(completeMatch[1])) {
-      return await complete(req, requestId, completeMatch[1]!);
+    const jobMatch = /^\/v1\/jobs\/([^/]+)\/(complete|heartbeat|fail)$/.exec(path);
+    if (req.method === 'POST' && jobMatch && isUuid(jobMatch[1])) {
+      const handler = { complete, heartbeat, fail }[jobMatch[2] as 'complete' | 'heartbeat' | 'fail'];
+      return await handler(req, requestId, jobMatch[1]!);
     }
     throw appError(404, 'NOT_FOUND');
   } catch (error) {

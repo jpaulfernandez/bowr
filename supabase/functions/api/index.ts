@@ -160,6 +160,28 @@ route('POST', /^\/v1\/upload-entries\/([^/]+)\/cancel$/, async ({ req, requestId
   );
 });
 
+route('POST', /^\/v1\/upload-entries\/([^/]+)\/retry$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  const result = (await callService('svc_retry_upload_entry', { p_user_id: userId, p_entry_id: params[0] })) as {
+    job_id: string;
+  };
+  afterResponse(dispatchJob(result.job_id));
+  return json(req, requestId, 202, { ...result, poll_after_ms: 2000 });
+});
+
+route('GET', /^\/v1\/upload-entries\/([^/]+)\/status$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  return json(
+    req,
+    requestId,
+    200,
+    await callService('svc_entry_job_status', { p_user_id: userId, p_entry_id: params[0] }),
+  );
+});
+
 route('POST', /^\/v1\/media\/access$/, async ({ req, requestId }) => {
   const { userId } = await requireCaller(req);
   const body = await jsonBody(req, ['requests']);

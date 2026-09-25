@@ -75,10 +75,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P0.04-T1** Complete the private jobs/payloads introduced by P0.03 with dependency and dedupe identity, queued/running/retry/blocked/review/terminal states. Commit validation jobs with upload completion; connect existing receipt to durable status.
-- [ ] **P0.04-T2** Implement authenticated Modal wake-up, single-use claim nonce, job/stage-scoped execution capabilities, claim locks, lease generation and fenced callbacks. Worker gets no general database, Gemini or R2 master key.
-- [ ] **P0.04-T3** Add heartbeat, bounded concurrency/deadlines, maximum three deterministic attempts, immutable output/checksum handling and canceled-target cleanup. Start from architecture limits, then measure before tuning.
-- [ ] **P0.04-T4** Schedule minute dispatch/reconciliation using protected maintenance credentials; recover missed dispatch and expired leases. Poll 2/5/10 seconds while visible, stop at terminal state, refetch on focus. Expose safe failure codes and manual retry/cancel.
+- [x] **P0.04-T1** Complete the private jobs/payloads introduced by P0.03 with dependency and dedupe identity, queued/running/retry/blocked/review/terminal states. Commit validation jobs with upload completion; connect existing receipt to durable status.
+- [x] **P0.04-T2** Implement authenticated Modal wake-up, single-use claim nonce, job/stage-scoped execution capabilities, claim locks, lease generation and fenced callbacks. Worker gets no general database, Gemini or R2 master key.
+- [x] **P0.04-T3** Add heartbeat, bounded concurrency/deadlines, maximum three deterministic attempts, immutable output/checksum handling and canceled-target cleanup. Start from architecture limits, then measure before tuning.
+- [x] **P0.04-T4** Schedule minute dispatch/reconciliation using protected maintenance credentials; recover missed dispatch and expired leases. Poll 2/5/10 seconds while visible, stop at terminal state, refetch on focus. Expose safe failure codes and manual retry/cancel.
 
 Acceptance:
 

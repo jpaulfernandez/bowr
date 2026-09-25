@@ -72,9 +72,37 @@ export const WorkerCompleteRequest = z.discriminatedUnion('outcome', [
     .strict(),
 ]);
 
+export const WorkerHeartbeatRequest = z
+  .object({ schema_version: z.literal(1), lease_generation: z.number().int().positive() })
+  .strict();
+
+export const WorkerHeartbeatResponse = z.discriminatedUnion('status', [
+  z
+    .object({
+      status: z.literal('renewed'),
+      lease_expires_at: z.string(),
+      capability: z.string().min(20).max(2000),
+      output: z.object({ url: z.string().url(), content_type: z.literal('image/webp') }).strict(),
+    })
+    .strict(),
+  z.object({ status: z.enum(['stale', 'deadline_exceeded']) }).strict(),
+]);
+
+/** Transient failures only; unusable files are reported through completion. */
+export const WorkerFailRequest = z
+  .object({
+    schema_version: z.literal(1),
+    lease_generation: z.number().int().positive(),
+    failure_code: z.enum(['TRANSIENT_STORAGE', 'WORKER_ERROR', 'DEADLINE_EXCEEDED']),
+  })
+  .strict();
+
 /** Schemas exported for the worker, keyed by generated file name. */
 export const workerJsonSchemas = {
   'worker_wake.schema.json': WorkerWake,
   'worker_claim_response.schema.json': WorkerClaimResponse,
   'worker_complete_request.schema.json': WorkerCompleteRequest,
+  'worker_heartbeat_request.schema.json': WorkerHeartbeatRequest,
+  'worker_heartbeat_response.schema.json': WorkerHeartbeatResponse,
+  'worker_fail_request.schema.json': WorkerFailRequest,
 } as const;

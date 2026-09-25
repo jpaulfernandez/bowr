@@ -1,7 +1,7 @@
 // P0.03 integration: private upload, validation and signed access against the
 // real local database, Edge API, object store and worker.
 import { randomBytes, randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { api, maintenance } from '../../../tests/support/api';
 import { createIdentity } from '../../../tests/support/identities';
 import { createSlot, mediaFixtures, member, putSlot, sha256, storageAdmin, type Member } from '../../../tests/support/media';
@@ -276,9 +276,19 @@ describe('P0.03-A4: request identity and truthful status', () => {
 });
 
 describe('P0.03-T3: authenticated, scoped worker API', () => {
+  const harnessEntries: string[] = [];
+  // Jobs claimed by the test harness never finish; cancel them so they do not
+  // hold processing slots for later tests.
+  afterEach(async () => {
+    for (const entryId of harnessEntries.splice(0)) {
+      await api(`/upload-entries/${entryId}/cancel`, { token: a.token, method: 'POST' });
+    }
+  });
+
   /** Queues a validation job without dispatching the running worker. */
   async function queuedJob(owner: Member): Promise<{ jobId: string; entryId: string }> {
     const { entry } = await createSlot(owner.token, fixtures.png, 'image/png');
+    harnessEntries.push(entry.entry_id);
     await putSlot(entry, fixtures.png);
     const [row] = await sql()`select public.svc_complete_upload_entry(${owner.id}, ${randomUUID()}, ${entry.entry_id}, ${fixtures.png.length}) as r`;
     return { jobId: row!.r.job_id, entryId: entry.entry_id };

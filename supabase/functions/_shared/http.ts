@@ -34,6 +34,8 @@ const messages: Record<string, string> = {
   UPLOAD_NOT_RENEWABLE: 'This upload can no longer be renewed.',
   UPLOAD_NOT_CANCELABLE: 'This upload has already finished.',
   CLAIM_REJECTED: 'Claim rejected.',
+  RETRY_NOT_AVAILABLE: 'This photo is not waiting for a retry.',
+  RETRY_LIMIT_REACHED: 'This photo has been retried too many times. Choose it again or remove it.',
   CAPABILITY_REJECTED: 'Capability rejected.',
   OUTPUT_REJECTED: 'Output rejected.',
   INVITE_UNAVAILABLE: "This invite code isn't available. Check it, or ask the owner for a new one.",

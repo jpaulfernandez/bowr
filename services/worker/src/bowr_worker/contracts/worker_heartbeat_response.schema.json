@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "renewed"
+        },
+        "lease_expires_at": {
+          "type": "string"
+        },
+        "capability": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 2000
+        },
+        "output": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "content_type": {
+              "type": "string",
+              "const": "image/webp"
+            }
+          },
+          "required": [
+            "url",
+            "content_type"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "status",
+        "lease_expires_at",
+        "capability",
+        "output"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "stale",
+            "deadline_exceeded"
+          ]
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

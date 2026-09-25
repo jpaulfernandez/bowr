@@ -2,12 +2,15 @@
 
 The worker holds no database, provider or bucket credentials. It receives a
 single-use claim token, exchanges it for a job-scoped capability and exact signed
-URLs, and reports a typed result. Signed URLs are never logged.
+URLs, keeps its lease alive with heartbeats, and reports a typed result. Signed
+URLs are never logged.
 """
 
 from __future__ import annotations
 
 import logging
+import threading
+from collections.abc import Callable
 from typing import Any
 
 import httpx
@@ -19,6 +22,62 @@ log = logging.getLogger("bowr_worker")
 # httpx logs full request URLs at INFO; signed URLs are bearer capabilities.
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+HEARTBEAT_SECONDS = 15.0
+
+
+class Lease:
+    """Renews the job lease in the background (ARCHITECTURE section 9.2).
+
+    A refused renewal (stale lease or stage deadline) marks the lease lost; the
+    job is then abandoned without uploading or completing, because a newer attempt
+    may own it.
+    """
+
+    def __init__(self, job: dict[str, Any], internal_api: str, client: httpx.Client, interval: float) -> None:
+        self.job_id: str = job["job_id"]
+        self.generation: int = job["lease_generation"]
+        self.capability: str = job["capability"]
+        self.output_url: str = job["output"]["url"]
+        self.lost = threading.Event()
+        self._stop = threading.Event()
+        self._lock = threading.Lock()
+        self._api = internal_api
+        self._client = client
+        self._interval = interval
+        self._thread = threading.Thread(target=self._run, name=f"heartbeat-{self.job_id}", daemon=True)
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        self._thread.join(timeout=5)
+
+    def auth(self) -> dict[str, str]:
+        with self._lock:
+            return {"Authorization": f"Bearer {self.capability}"}
+
+    def _run(self) -> None:
+        while not self._stop.wait(self._interval):
+            body = {"schema_version": 1, "lease_generation": self.generation}
+            validate("worker_heartbeat_request", body)
+            try:
+                response = self._client.post(
+                    f"{self._api}/v1/jobs/{self.job_id}/heartbeat", json=body, headers=self.auth(), timeout=10
+                )
+                data = response.json()["data"] if response.status_code == 200 else {"status": "stale"}
+                validate("worker_heartbeat_response", data)
+            except (httpx.HTTPError, ValueError, KeyError):
+                # A missed heartbeat is retried; the lease survives until its expiry.
+                continue
+            if data["status"] != "renewed":
+                log.info("job %s lease %s", self.job_id, data["status"])
+                self.lost.set()
+                return
+            with self._lock:
+                self.capability = data["capability"]
+                self.output_url = data["output"]["url"]
 
 
 def _download(client: httpx.Client, url: str, max_bytes: int) -> bytes | None:
@@ -36,7 +95,33 @@ def _download(client: httpx.Client, url: str, max_bytes: int) -> bytes | None:
         return b"".join(chunks)
 
 
-def run_job(wake: dict[str, Any], internal_api: str, client: httpx.Client) -> str:
+def _report_failure(client: httpx.Client, internal_api: str, lease: Lease, code: str) -> str:
+    body = {"schema_version": 1, "lease_generation": lease.generation, "failure_code": code}
+    validate("worker_fail_request", body)
+    try:
+        response = client.post(
+            f"{internal_api}/v1/jobs/{lease.job_id}/fail", json=body, headers=lease.auth(), timeout=30
+        )
+        status = (
+            response.json().get("data", {}).get("status")
+            if response.status_code == 200
+            else response.status_code
+        )
+    except (httpx.HTTPError, ValueError):
+        # If the report is lost, the lease expires and reconciliation retries the job.
+        status = "unreported"
+    log.info("job %s attempt failed (%s) -> %s", lease.job_id, code, status)
+    return f"failed:{code}:{status}"
+
+
+def run_job(
+    wake: dict[str, Any],
+    internal_api: str,
+    client: httpx.Client,
+    *,
+    heartbeat_seconds: float = HEARTBEAT_SECONDS,
+    before_process: Callable[[], None] | None = None,
+) -> str:
     """Processes one job. Returns a short outcome label for operational logs."""
     validate("worker_wake", wake)
     claimed = client.post(f"{internal_api}/v1/jobs/claim", json=wake, timeout=30)
@@ -47,8 +132,12 @@ def run_job(wake: dict[str, Any], internal_api: str, client: httpx.Client) -> st
     validate("worker_claim_response", job)
     spec = job["input"]
 
+    lease = Lease(job, internal_api, client, heartbeat_seconds)
+    lease.start()
     body: dict[str, Any]
     try:
+        if before_process:
+            before_process()
         source = _download(client, job["source"]["url"], spec["max_bytes"] + 1)
         if source is None:
             raise MediaRejected("SOURCE_MISSING")
@@ -60,8 +149,10 @@ def run_job(wake: dict[str, Any], internal_api: str, client: httpx.Client) -> st
             max_pixels=spec["max_pixels"],
             max_edge=spec["max_edge"],
         )
+        if lease.lost.is_set():
+            return "lease_lost"
         uploaded = client.put(
-            job["output"]["url"],
+            lease.output_url,
             content=image.data,
             headers={"Content-Type": job["output"]["content_type"]},
             timeout=60,
@@ -85,13 +176,19 @@ def run_job(wake: dict[str, Any], internal_api: str, client: httpx.Client) -> st
             "outcome": "rejected",
             "failure_code": rejected.code,
         }
+    except httpx.HTTPError:
+        return _report_failure(client, internal_api, lease, "TRANSIENT_STORAGE")
+    except Exception:
+        log.exception("job %s worker error", lease.job_id)
+        return _report_failure(client, internal_api, lease, "WORKER_ERROR")
+    finally:
+        lease.stop()
 
+    if lease.lost.is_set():
+        return "lease_lost"
     validate("worker_complete_request", body)
     completed = client.post(
-        f"{internal_api}/v1/jobs/{job['job_id']}/complete",
-        json=body,
-        headers={"Authorization": f"Bearer {job['capability']}"},
-        timeout=30,
+        f"{internal_api}/v1/jobs/{job['job_id']}/complete", json=body, headers=lease.auth(), timeout=30
     )
     status = (
         completed.json().get("data", {}).get("status")

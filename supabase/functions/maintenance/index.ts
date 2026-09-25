@@ -1,6 +1,7 @@
 // Scheduled maintenance, called by pg_cron through pg_net with a machine secret.
 // There is no user-facing route here and user JWTs are not accepted.
 import { serviceClient } from '../_shared/service.ts';
+import { dispatchRunnable } from '../_shared/dispatch.ts';
 import { deleteObject } from '../_shared/storage.ts';
 
 function authorized(req: Request): boolean {
@@ -56,7 +57,20 @@ async function mediaDeletion() {
   return { claimed: (data ?? []).length, deleted, failed };
 }
 
+/** Recovers expired leases and due retries, then dispatches runnable jobs. */
+async function dispatchJobs() {
+  const db = serviceClient();
+  const summary = await dispatchRunnable(20);
+  const { data: stuck } = await db.rpc('svc_stuck_jobs');
+  if ((stuck ?? []).length > 0) {
+    // Safe operational alert: job IDs and states only.
+    console.warn(JSON.stringify({ alert: 'stuck_jobs', jobs: stuck }));
+  }
+  return { ...summary, stuck: (stuck ?? []).length };
+}
+
 const tasks: Record<string, () => Promise<Record<string, number>>> = {
+  dispatch_jobs: dispatchJobs,
   pending_account_cleanup: pendingAccountCleanup,
   media_deletion: mediaDeletion,
 };

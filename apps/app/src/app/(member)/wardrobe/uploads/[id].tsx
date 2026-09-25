@@ -1,5 +1,6 @@
 import { EntryState } from '@bowr/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRef, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 import { z } from 'zod';
@@ -14,6 +15,8 @@ import { apiRequest, guardedRead } from '../../../../lib/api';
 import { formatDateTime } from '../../../../lib/format';
 import { userKeys } from '../../../../lib/query-keys';
 import { useSession } from '../../../../lib/session';
+import { ApiError } from '../../../../lib/errors';
+import { pickImages } from '../../../../platform/image-picker';
 import { supabase } from '../../../../lib/supabase';
 
 const Entries = z.array(
@@ -22,6 +25,7 @@ const Entries = z.array(
     asset_id: z.string().uuid(),
     state: EntryState,
     failure_code: z.string().nullable(),
+    declared_content_type: z.string(),
     created_at: z.string(),
   }),
 );
@@ -35,6 +39,9 @@ export default function UploadReceipt() {
   const queryClient = useQueryClient();
   const local = useLocalUploads();
   const key = [...userKeys.all(userId ?? 'none'), 'upload-batch', id] as const;
+  // Poll every 2 s at first, then 5 s, then 10 s while work is moving (P0.04-T4).
+  const pollingSince = useRef<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const entries = useQuery({
     queryKey: key,
@@ -43,7 +50,7 @@ export default function UploadReceipt() {
         await guardedRead(() =>
           supabase
             .from('upload_entries')
-            .select('id, asset_id, state, failure_code, created_at')
+            .select('id, asset_id, state, failure_code, declared_content_type, created_at')
             .eq('batch_id', id)
             .order('created_at')
             .order('id')
@@ -52,11 +59,20 @@ export default function UploadReceipt() {
       ),
     enabled: userId !== null && typeof id === 'string',
     // Poll only while server-side work or local uploads are still moving.
+    // Stops at terminal states; hidden tabs do not poll, and focus refetches.
     refetchInterval: (query) => {
       const data = query.state.data;
       const moving = data?.some((e) => inProgress(e) || (e.state === 'awaiting_upload' && local.get(e.id)?.status !== 'failed' && local.has(e.id)));
-      return moving ? 2000 : false;
+      if (!moving) {
+        pollingSince.current = null;
+        return false;
+      }
+      pollingSince.current ??= Date.now();
+      const elapsed = Date.now() - pollingSince.current;
+      return elapsed < 10_000 ? 2000 : elapsed < 60_000 ? 5000 : 10_000;
     },
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 
   const cancel = useMutation({
@@ -68,12 +84,34 @@ export default function UploadReceipt() {
     },
   });
 
+  const retry = useMutation({
+    mutationFn: (entryId: string) =>
+      apiRequest(`/upload-entries/${entryId}/retry`, { method: 'POST', idempotencyKey: crypto.randomUUID(), schema: z.unknown() }),
+    onSuccess: () => {
+      pollingSince.current = null;
+      void queryClient.invalidateQueries({ queryKey: key });
+    },
+    onError: (err) => setNotice(err instanceof ApiError ? err.message : "bowr couldn't retry this photo. Try again."),
+  });
+
+  const chooseAgain = async (entry: Entry) => {
+    const [picked] = await pickImages({ capture: false });
+    if (!picked) return;
+    if (picked.type !== entry.declared_content_type) {
+      setNotice('Choose the same photo you selected before, in the same format.');
+      return;
+    }
+    setNotice(null);
+    pollingSince.current = null;
+    uploadManager.reselect(entry.id, { file: picked.file, name: picked.name });
+  };
+
   const rows = entries.data ?? [];
   const sending = rows.filter((e) => e.state === 'awaiting_upload' && local.has(e.id) && local.get(e.id)!.status !== 'failed');
   const uploaded = rows.filter((e) => e.state !== 'awaiting_upload' && e.state !== 'canceled').length;
   const checking = rows.filter(inProgress).length;
   const ready = rows.filter((e) => e.state === 'ready').length;
-  const attention = rows.filter((e) => e.state === 'rejected' || (e.state === 'awaiting_upload' && (!local.has(e.id) || local.get(e.id)?.status === 'failed'))).length;
+  const attention = rows.filter((e) => e.state === 'rejected' || e.state === 'failed' || (e.state === 'awaiting_upload' && (!local.has(e.id) || local.get(e.id)?.status === 'failed'))).length;
 
   const summary =
     sending.length > 0
@@ -85,6 +123,7 @@ export default function UploadReceipt() {
   return (
     <Screen title="Upload receipt" subtitle={rows[0] ? `Started ${formatDateTime(rows[0].created_at)}` : undefined}>
       {entries.isError ? <Banner tone="error" message="This receipt couldn't load." /> : null}
+      {notice ? <Banner tone="error" message={notice} /> : null}
       {rows.length > 0 ? (
         <Text role="status" aria-live="polite" className="max-w-prose text-body text-text">
           {summary}
@@ -104,12 +143,23 @@ export default function UploadReceipt() {
               )}
               <View className="min-w-0 flex-1 basis-[160px] gap-2">
                 <Text className="text-action text-text">{label}</Text>
-                <Text className={entry.state === 'rejected' ? 'text-secondary text-error' : 'text-secondary text-text-secondary'}>{status}</Text>
+                <Text className={entry.state === 'rejected' || entry.state === 'failed' ? 'text-secondary text-error' : 'text-secondary text-text-secondary'}>{status}</Text>
                 <View className="flex-row flex-wrap gap-2">
                   {task?.status === 'failed' ? (
                     <Button label={`Retry photo ${index + 1}`} variant="secondary" onPress={() => uploadManager.retry(entry.id)} />
                   ) : null}
-                  {['awaiting_upload', 'uploaded', 'validating'].includes(entry.state) ? (
+                  {entry.state === 'awaiting_upload' && !task ? (
+                    <Button label={`Choose photo ${index + 1} again`} variant="secondary" onPress={() => void chooseAgain(entry)} />
+                  ) : null}
+                  {entry.state === 'failed' ? (
+                    <Button
+                      label={`Try photo ${index + 1} again`}
+                      variant="secondary"
+                      busy={retry.isPending && retry.variables === entry.id}
+                      onPress={() => retry.mutate(entry.id)}
+                    />
+                  ) : null}
+                  {['awaiting_upload', 'uploaded', 'validating', 'failed'].includes(entry.state) ? (
                     <Button
                       label={`Cancel photo ${index + 1}`}
                       variant="quiet"

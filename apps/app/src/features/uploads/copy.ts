@@ -9,6 +9,7 @@ const failures: Record<string, string> = {
   CORRUPT_IMAGE: "This photo couldn't be read. It may be damaged.",
   ANIMATED_IMAGE: "Animated images aren't supported. Choose a still photo.",
   SOURCE_MISSING: "The upload didn't arrive. Choose the photo again.",
+  PROCESSING_FAILED: "bowr couldn't finish checking this photo. Your upload is saved; try again.",
 };
 
 export const failureMessage = (code: string | null) =>
@@ -26,5 +27,6 @@ export function entryStatus(state: EntryState, local: LocalUpload | undefined, f
   if (state === 'uploaded' || state === 'validating') return 'Uploaded · checking photo';
   if (state === 'ready') return 'Ready';
   if (state === 'canceled') return 'Canceled';
+  if (state === 'failed') return failureMessage(failureCode);
   return failureMessage(failureCode);
 }

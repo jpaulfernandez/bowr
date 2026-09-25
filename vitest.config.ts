@@ -14,6 +14,7 @@ export default defineConfig({
         test: {
           name: 'integration',
           include: ['supabase/tests/integration/**/*.test.ts'],
+          globalSetup: ['supabase/tests/integration/global-setup.ts'],
           environment: 'node',
           fileParallelism: false,
           testTimeout: 60_000,

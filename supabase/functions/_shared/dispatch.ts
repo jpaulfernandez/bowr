@@ -20,13 +20,13 @@ export async function dispatchJob(jobId: string): Promise<'dispatched' | 'not_qu
   if (!url || !key || !secret) return 'failed';
 
   const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, '0')).join('');
-  const { data: issued, error } = await serviceClient().rpc('svc_issue_job_claim', {
-    p_job_id: jobId,
-    p_nonce_hash: await sha256Hex(token),
-  });
+  const nonceHash = await sha256Hex(token);
+  const db = serviceClient();
+  const { data: issued, error } = await db.rpc('svc_issue_job_claim', { p_job_id: jobId, p_nonce_hash: nonceHash });
   if (error) return 'failed';
   if (!issued) return 'not_queued';
 
+  let ok = false;
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -34,9 +34,29 @@ export async function dispatchJob(jobId: string): Promise<'dispatched' | 'not_qu
       body: JSON.stringify({ job_id: jobId, claim_token: token }),
       signal: AbortSignal.timeout(5000),
     });
-    return response.ok ? 'dispatched' : 'failed';
+    ok = response.ok;
   } catch {
-    // The job stays queued; P0.04 reconciliation re-dispatches it.
+    ok = false;
+  }
+  if (!ok) {
+    // The job stays queued; the minute scheduler dispatches it again.
+    await db.rpc('svc_release_job_claim', { p_job_id: jobId, p_nonce_hash: nonceHash });
     return 'failed';
   }
+  return 'dispatched';
+}
+
+/** Reconciles and dispatches runnable jobs, within the concurrency limits. */
+export async function dispatchRunnable(
+  limit = 20,
+): Promise<{ runnable: number; dispatched: number; deferred: number }> {
+  const { data, error } = await serviceClient().rpc('svc_reconcile_jobs', { p_limit: limit });
+  if (error) throw new Error(`reconcile failed: ${error.code}`);
+  let dispatched = 0;
+  let deferred = 0;
+  for (const row of (data ?? []) as Array<{ job_id: string }>) {
+    if ((await dispatchJob(row.job_id)) === 'dispatched') dispatched += 1;
+    else deferred += 1;
+  }
+  return { runnable: (data ?? []).length, dispatched, deferred };
 }
