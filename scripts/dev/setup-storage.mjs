@@ -1,6 +1,7 @@
-// Creates the private bucket and applies exact-origin CORS. Works against the local
+// Creates the private bucket (with exact-origin CORS) and the deletion journal bucket. Works against the local
 // gateway and against R2 (S3 API). Usage:
 //   R2_PUBLIC_ENDPOINT=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... R2_BUCKET=... APP_ORIGINS=... \
+//   DELETION_JOURNAL_BUCKET=... \
 //   node scripts/dev/setup-storage.mjs
 // Defaults read supabase/functions/.env (local values only).
 import { createHash } from 'node:crypto';
@@ -35,3 +36,11 @@ const corsResponse = await aws.fetch(`${endpoint}/${bucket}?cors`, {
 });
 if (!corsResponse.ok) throw new Error(`CORS configuration failed: ${corsResponse.status} ${await corsResponse.text()}`);
 console.log(`Bucket ${bucket} ready at ${endpoint} with CORS for ${origins.join(', ')}`);
+
+// The journal is never read by browsers: no CORS rule.
+const journal = env('DELETION_JOURNAL_BUCKET');
+if (journal) {
+  const journalCreated = await aws.fetch(`${endpoint}/${journal}`, { method: 'PUT' });
+  if (!journalCreated.ok && journalCreated.status !== 409) throw new Error(`journal bucket create failed: ${journalCreated.status}`);
+  console.log(`Deletion journal bucket ${journal} ready`);
+}

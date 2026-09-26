@@ -44,11 +44,27 @@ export default function Privacy() {
           camera and other embedded details removed, and deletes the file you uploaded after checking it. Uploads that
           are canceled or cannot be used are deleted too.
         </Text>
+        <Text>
+          Photos you started to upload but never finished are deleted within about an hour after the upload link
+          expires.
+        </Text>
+        <Heading level={2}>Usage events</Heading>
+        <Text>
+          bowr records a few usage events, such as which screen was opened, how many photos an upload started with,
+          and short error codes. They are tied to a random account number, never your email. They never include
+          photos, links, anything you type, invite codes or your location, and there is no screen recording.
+        </Text>
+        <Heading level={2}>Backups</Heading>
+        <Text>
+          The database is backed up daily and backups are kept for seven days, so deleted account details can remain in
+          a backup until it expires. Backups do not contain photos. If a backup is ever restored, deletions made after
+          it was taken are applied again before bowr is used.
+        </Text>
         <Heading level={2}>Not collected yet</Heading>
         <Text>
-          bowr does not yet send your photos or anything you type to an AI provider, and it does not record usage
-          analytics. The owner can run a diagnostic that sends one fixed test sentence with no personal content. This
-          page will change before AI features or analytics are turned on.
+          bowr does not yet send your photos or anything you type to an AI provider. The owner can run a diagnostic
+          that sends one fixed test sentence with no personal content. This page will change before AI features are
+          turned on.
         </Text>
       </Prose>
     </Screen>

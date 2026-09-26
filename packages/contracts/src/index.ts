@@ -7,3 +7,5 @@ export * from './worker';
 export * from './uploads';
 export * from './budget';
 export * from './account';
+export * from './analytics';
+export * from './operations';

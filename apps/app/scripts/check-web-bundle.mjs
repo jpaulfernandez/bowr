@@ -13,6 +13,8 @@ const forbidden = [
   [/SUPABASE_SERVICE_ROLE_KEY|SERVICE_ROLE_KEY/, 'service-role variable name'],
   [/INVITE_HMAC_SECRET|WORKER_CAPABILITY_SECRET|MAINTENANCE_SECRET/, 'server secret variable name'],
   [/GEMINI_API_KEY|R2_SECRET_ACCESS_KEY|MODAL_TOKEN/, 'provider secret variable name'],
+  [/HEALTH_CHECK_TOKEN|BACKUP_ENCRYPTION_KEY|POSTHOG_API_KEY/, 'operations secret variable name'],
+  [/phx_[A-Za-z0-9]{8,}/, 'PostHog personal API key'],
   [/sourceMappingURL=/, 'source map reference'],
 ];
 

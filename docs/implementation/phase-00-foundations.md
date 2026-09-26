@@ -134,10 +134,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P0.07-T1** Create CI for contracts/types, RLS/integration/worker checks, web export and immutable worker build; staging promotion order is additive migration → compatible worker/internal → public API → web. Document artifact rollback and environment/secret inventory.
-- [ ] **P0.07-T2** Implement five-minute temporary cleanup, daily orphan reconciliation and expiry checks at sign/read/callback. Measure one-hour abandoned-upload cleanup and 24-hour retained-asset deletion targets; install an independent missed-heartbeat/stuck-work alert and manual recovery command.
-- [ ] **P0.07-T3** Configure encrypted daily DB exports, seven-day retention and an external minimal deletion journal. Rehearse isolated Auth/schema restore, deletion replay, expired-session purge, stale job/AI disablement and media existence reconciliation. Document 24-hour RPO/one-day restoration targets and absence of independent retained-media backup.
-- [ ] **P0.07-T4** Wire allowlisted PostHog events with recording/autocapture/automatic URL capture off; scrub errors and route templates. Add redacted operational health/spend/deletion summaries and infrastructure resource alerts without a new monitoring platform.
+- [x] **P0.07-T1** Create CI for contracts/types, RLS/integration/worker checks, web export and immutable worker build; staging promotion order is additive migration → compatible worker/internal → public API → web. Document artifact rollback and environment/secret inventory.
+- [x] **P0.07-T2** Implement five-minute temporary cleanup, daily orphan reconciliation and expiry checks at sign/read/callback. Measure one-hour abandoned-upload cleanup and 24-hour retained-asset deletion targets; install an independent missed-heartbeat/stuck-work alert and manual recovery command.
+- [x] **P0.07-T3** Configure encrypted daily DB exports, seven-day retention and an external minimal deletion journal. Rehearse isolated Auth/schema restore, deletion replay, expired-session purge, stale job/AI disablement and media existence reconciliation. Document 24-hour RPO/one-day restoration targets and absence of independent retained-media backup.
+- [x] **P0.07-T4** Wire allowlisted PostHog events with recording/autocapture/automatic URL capture off; scrub errors and route templates. Add redacted operational health/spend/deletion summaries and infrastructure resource alerts without a new monitoring platform.
 
 Acceptance:
 
@@ -149,8 +149,10 @@ Acceptance:
 ## Phase exit and rollback
 
 - [ ] Real friend admission/private-upload/zero-AI demo passes; all P0 acceptance evidence exists.
-- [ ] Ownership, invite/cleanup races, worker recovery, budget concurrency and account deletion pass against actual transactions.
+- [x] Ownership, invite/cleanup races, worker recovery, budget concurrency and account deletion pass against actual transactions.
 - [ ] Real SMTP/R2/Modal configuration, format support and paid-model gates are recorded; unresolved provider gates are explicitly disabled.
-- [ ] Cleanup and deletion-aware restore are demonstrated; published privacy text matches observed behavior.
+- [x] Cleanup and deletion-aware restore are demonstrated; published privacy text matches observed behavior.
+
+Exit status (26 September 2026): every P0 slice passes its local acceptance against the real local stack; evidence is in [evidence/](evidence/). The deletion-aware restore is demonstrated locally (P0.07-A2 local rehearsal); its staging rehearsal remains a P0.07 gate. The two open items wait on staging and provider accounts: SMTP and Google OAuth (P0.02-T3), R2 and Modal with HEIC (P0.03-T2), paid Gemini (P0.05-T5), and the deployed heartbeat, restore and rollback checks (P0.07-A1/A2/A4). Until then, AI stays disabled (`AI_ENABLED=false`), Google sign-in stays hidden (`EXPO_PUBLIC_AUTH_GOOGLE_ENABLED=false`), and HEIC stays unadvertised (`UPLOAD_HEIC_ENABLED=false`) outside local.
 
 Disable AI/processing admission independently during incidents; keep membership and safe reads intact where services permit. Roll back immutable compatible artifacts, retain ledger/deletion manifests, and drain cleanup. Never clear uncertain spend or destructively roll back production schema to recover availability.

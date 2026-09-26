@@ -2,17 +2,19 @@
 // script writes them to the Vercel Build Output config; the local server applies
 // the same config, so E2E tests exercise the headers that are deployed.
 
-/** @param {{ supabaseUrl: string, mediaOrigin: string }} options */
-export function securityHeaders({ supabaseUrl, mediaOrigin }) {
+/** @param {{ supabaseUrl: string, mediaOrigin: string, analyticsHost?: string }} options */
+export function securityHeaders({ supabaseUrl, mediaOrigin, analyticsHost }) {
   const api = new URL(supabaseUrl).origin;
   // Private photos: signed uploads (PUT) and signed views (img) go to object storage.
   const media = new URL(mediaOrigin).origin;
+  // Allowlisted analytics events only (lib/analytics.ts); omitted when analytics is off.
+  const analytics = analyticsHost ? ` ${new URL(analyticsHost).origin}` : '';
   const csp = [
     "default-src 'self'",
     "script-src 'self'",
     // react-native-web injects its generated styles at runtime.
     "style-src 'self' 'unsafe-inline'",
-    `connect-src 'self' ${api} ${media}`,
+    `connect-src 'self' ${api} ${media}${analytics}`,
     `img-src 'self' data: blob: ${media}`,
     "font-src 'self' data:",
     "manifest-src 'self'",

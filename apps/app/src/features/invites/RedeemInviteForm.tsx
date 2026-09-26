@@ -6,6 +6,7 @@ import { View } from 'react-native';
 import { Banner } from '../../components/Banner';
 import { Button } from '../../components/Button';
 import { TextField } from '../../components/TextField';
+import { track } from '../../lib/analytics';
 import { apiRequest } from '../../lib/api';
 import { ApiError } from '../../lib/errors';
 import { formatTimeFromNow } from '../../lib/format';
@@ -29,6 +30,7 @@ export function RedeemInviteForm({ userId }: { userId: string }) {
     },
     onSuccess: async () => {
       request.current = null;
+      track({ event: 'invite_redeemed', properties: {} });
       await queryClient.invalidateQueries({ queryKey: userKeys.bootstrap(userId) });
       router.replace('/onboarding');
     },

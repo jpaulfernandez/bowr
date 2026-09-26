@@ -6,6 +6,7 @@ import { Button } from '../../../components/Button';
 import { Screen } from '../../../components/Screen';
 import { Heading, Text } from '../../../components/Text';
 import { AdminInvites, adminOverviewKey } from '../../../features/admin/AdminInvites';
+import { AdminOperations } from '../../../features/admin/AdminOperations';
 import { AdminSpend } from '../../../features/admin/AdminSpend';
 import { MemberActions } from '../../../features/admin/MemberActions';
 import { apiRequest } from '../../../lib/api';
@@ -24,7 +25,7 @@ export default function Admin() {
   });
 
   return (
-    <Screen title="Admin" subtitle="AI spend, members and invites">
+    <Screen title="Admin" subtitle="AI spend, members, invites and background work">
       {overview.isPending ? <Text variant="secondary">Loading administration</Text> : null}
       {overview.isError ? (
         <Banner tone="error" message="Administration couldn't load.">
@@ -55,6 +56,7 @@ export default function Admin() {
             </View>
           </View>
           <AdminInvites userId={userId} invites={overview.data.invites} />
+          <AdminOperations userId={userId} />
         </View>
       ) : null}
     </Screen>

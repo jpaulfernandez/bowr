@@ -3,7 +3,9 @@
 import { CompletedEntry, RenewedUpload, type SignedUpload, type UploadSlot } from '@bowr/contracts';
 import { useSyncExternalStore } from 'react';
 import { onAccountDispose } from '../../lib/account-lifecycle';
+import { track } from '../../lib/analytics';
 import { apiRequest } from '../../lib/api';
+import { ApiError } from '../../lib/errors';
 
 export type LocalStatus = 'queued' | 'uploading' | 'completing' | 'done' | 'failed';
 export type LocalUpload = { entryId: string; name: string; status: LocalStatus; progress: number; error?: string };
@@ -67,11 +69,15 @@ async function run(task: Task) {
   } catch (error) {
     if (!tasks.has(task.entryId)) return;
     update(task.entryId, { status: 'failed', error: (error as Error).message });
+    track({ event: 'upload_failed', properties: { code: error instanceof ApiError ? error.code : 'TRANSFER_FAILED', format: formatOf(task.file) } });
   } finally {
     task.xhr = undefined;
     pump();
   }
 }
+
+const formats = ['jpeg', 'png', 'webp', 'heic', 'heif'] as const;
+const formatOf = (file: File) => formats.find((f) => file.type === `image/${f}`) ?? 'other';
 
 function pump() {
   const active = Array.from(tasks.values()).filter((t) => t.status === 'uploading' || t.status === 'completing').length;
@@ -94,6 +100,8 @@ export const uploadManager = {
         progress: 0,
       });
     }
+    const started = slots.filter((slot) => slot.state === 'awaiting_upload' && files.has(slot.client_file_id)).length;
+    if (started > 0) track({ event: 'upload_started', properties: { files: started } });
     emit();
     pump();
   },

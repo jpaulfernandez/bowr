@@ -10,6 +10,7 @@ const failures: Record<string, string> = {
   ANIMATED_IMAGE: "Animated images aren't supported. Choose a still photo.",
   SOURCE_MISSING: "The upload didn't arrive. Choose the photo again.",
   PROCESSING_FAILED: "bowr couldn't finish checking this photo. Your upload is saved; try again.",
+  RESTORED: 'bowr was restored from a backup while this photo was being checked. Your upload is saved; try again.',
 };
 
 export const failureMessage = (code: string | null) =>

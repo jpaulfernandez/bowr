@@ -1,6 +1,6 @@
 # Environments and secrets
 
-Status: local environment implemented; staging and production are not provisioned yet. This inventory grows with each slice; P0.07 completes it with deployment and rollback steps.
+Status: local environment implemented; staging and production are not provisioned yet. Deployment and rollback: [deploy.md](deploy.md). Health, alerts and recovery: [operations.md](operations.md). Backups: [backup-restore.md](backup-restore.md).
 
 bowr uses separate **local**, **staging** and **production** environments (ARCHITECTURE section 14.1). Each has its own Supabase project, Auth callbacks, secrets and, in later slices, R2 bucket, Modal environment and Gemini project. Never copy a secret between environments, and never commit one.
 
@@ -39,7 +39,7 @@ select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/maint
 select vault.create_secret('<MAINTENANCE_SECRET value>', 'bowr_maintenance_secret');
 ```
 
-The migration schedules `bowr-pending-account-cleanup` hourly. If either Vault secret is missing, the job logs a warning and does nothing. P0.07 adds an independent heartbeat alert for missed runs.
+Migrations schedule every `bowr-*` task ([operations.md](operations.md)). If either Vault secret is missing, the jobs log a warning and do nothing; the external heartbeat check reports it.
 
 ## Private media storage and worker (P0.03)
 
@@ -74,3 +74,17 @@ The migration schedules `bowr-pending-account-cleanup` hourly. If either Vault s
 | `AI_CALL_TIMEOUT_MS` | Edge Function secrets (optional) | Provider call timeout; defaults to 30 s |
 
 Verification before enabling AI (P0.05-T5): confirm the model IDs and effective prices in `config/models.yaml` against Google's current pricing page. Set the Google project cap to $10 and disable automatic top-up where the billing account supports it. Run `SUPABASE_URL=... MAINTENANCE_SECRET=... pnpm ops:ai-smoke` once, then reconcile Google's usage report against `private.ai_usage`.
+
+## Operations, journal, backups and analytics (P0.07)
+
+| Name | Where it lives | Used by |
+| --- | --- | --- |
+| `HEALTH_CHECK_TOKEN` | Edge Function secrets, and the GitHub `staging`/`production` environment secret | Read-only `GET /maintenance/health` for the external heartbeat check |
+| `HEALTH_URL` | GitHub environment secret | `.github/workflows/heartbeat.yml` |
+| `HEALTH_CHECK_ENABLED` | GitHub repository variable | Turns the heartbeat workflow on once the environment exists |
+| `DELETION_JOURNAL_BUCKET` | Edge Function secrets | Separate private bucket for the deletion journal; same scoped R2 token or its own write-only token; 30-day lifecycle rule |
+| `BACKUP_ENCRYPTION_KEY` | Operator secret store only | `pnpm ops:backup-db` and `pnpm ops:restore-rehearsal`; never in Edge secrets or CI |
+| `POSTHOG_HOST`, `POSTHOG_API_KEY` | Edge Function secrets | Server-side allowlisted events (`budget_mode_changed`); unset disables them |
+| `EXPO_PUBLIC_POSTHOG_HOST`, `EXPO_PUBLIC_POSTHOG_KEY` | Web build environment (public project key) | Client allowlisted events; leave empty to send none. The host is added to the CSP `connect-src` |
+
+PostHog project settings: autocapture, heatmaps, session recording and surveys off; "Discard client IP data" on. The web client sends explicit capture calls only (`apps/app/src/lib/analytics.ts`); no PostHog script runs in the page.

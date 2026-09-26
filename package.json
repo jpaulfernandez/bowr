@@ -29,6 +29,9 @@
     "worker:serve": "cd services/worker && uv run python -m bowr_worker.local_server",
     "fake-ai:serve": "node scripts/dev/fake-gemini.mjs",
     "ops:ai-smoke": "node scripts/ops/ai-smoke.mjs",
+    "ops:recover-maintenance": "node scripts/ops/recover-maintenance.mjs",
+    "ops:backup-db": "node scripts/ops/backup-db.mjs",
+    "ops:restore-rehearsal": "node scripts/ops/restore-rehearsal.mjs",
     "test:functions": "deno test --config supabase/functions/deno.json supabase/functions/_shared"
   },
   "devDependencies": {

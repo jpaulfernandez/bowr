@@ -1,4 +1,5 @@
 import '../../global.css';
+import { routeTemplate } from '@bowr/contracts';
 import { decideRoute, type Gate as RouteGate } from '@bowr/domain';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Redirect, Slot, usePathname, type Href } from 'expo-router';
@@ -8,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Banner } from '../components/Banner';
 import { Button } from '../components/Button';
 import { LoadingScreen } from '../components/LoadingScreen';
+import { installErrorReporting, track } from '../lib/analytics';
 import { useBootstrap } from '../lib/bootstrap';
 import { ApiError } from '../lib/errors';
 import { createQueryClient } from '../lib/query-client';
@@ -36,6 +38,11 @@ function Gate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const session = useSession();
   const bootstrap = useBootstrap();
+  useEffect(() => installErrorReporting(), []);
+  useEffect(() => {
+    track({ event: 'screen_viewed', properties: { route: routeTemplate(pathname) } });
+  }, [pathname]);
+
   const sessionRejected =
     session.userId !== null && bootstrap.error instanceof ApiError && bootstrap.error.code === 'AUTH_REQUIRED';
 

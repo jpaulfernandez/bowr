@@ -26,8 +26,13 @@ function storage(): StorageConfig {
 
 export const bucketName = () => storage().bucket;
 
-function objectUrl(endpoint: string, key: string, query: Record<string, string> = {}): string {
-  const url = new URL(`${endpoint}/${storage().bucket}/${key.split('/').map(encodeURIComponent).join('/')}`);
+function objectUrl(
+  endpoint: string,
+  key: string,
+  query: Record<string, string> = {},
+  bucket = storage().bucket,
+): string {
+  const url = new URL(`${endpoint}/${bucket}/${key.split('/').map(encodeURIComponent).join('/')}`);
   for (const [name, value] of Object.entries(query)) url.searchParams.set(name, value);
   return url.toString();
 }
@@ -83,4 +88,51 @@ export async function deleteObject(key: string): Promise<boolean> {
   const response = await client.fetch(objectUrl(internalEndpoint, key), { method: 'DELETE' });
   if (!response.ok && response.status !== 404) throw new Error(`storage DELETE ${response.status}`);
   return (await headObject(key)) === null;
+}
+
+const xmlText = (value: string) =>
+  value.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(
+    /&amp;/g,
+    '&',
+  );
+
+/** Every key in the private bucket with its last-modified time (ListObjectsV2). */
+export async function listObjects(): Promise<Array<{ key: string; lastModified: number }>> {
+  const { client, internalEndpoint, bucket } = storage();
+  const objects: Array<{ key: string; lastModified: number }> = [];
+  let token: string | null = null;
+  do {
+    const url = new URL(`${internalEndpoint}/${bucket}`);
+    url.searchParams.set('list-type', '2');
+    url.searchParams.set('max-keys', '1000');
+    if (token) url.searchParams.set('continuation-token', token);
+    const response = await client.fetch(url.toString(), { method: 'GET' });
+    if (!response.ok) throw new Error(`storage LIST ${response.status}`);
+    const body = await response.text();
+    for (const [, contents] of body.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
+      const key = /<Key>([\s\S]*?)<\/Key>/.exec(contents!)?.[1];
+      const modified = /<LastModified>([^<]+)<\/LastModified>/.exec(contents!)?.[1];
+      if (key && modified) objects.push({ key: xmlText(key), lastModified: Date.parse(modified) });
+    }
+    token = /<IsTruncated>true<\/IsTruncated>/.test(body)
+      ? xmlText(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/.exec(body)?.[1] ?? '') || null
+      : null;
+  } while (token);
+  return objects;
+}
+
+/**
+ * Writes one entry to the deletion journal bucket, which lives outside the
+ * database's backup timeline (ARCHITECTURE 14.4). Holds pseudonymous IDs only.
+ */
+export async function putJournalEntry(key: string, body: string): Promise<void> {
+  const bucket = Deno.env.get('DELETION_JOURNAL_BUCKET');
+  if (!bucket) throw new Error('Deletion journal is not configured');
+  const { client, internalEndpoint } = storage();
+  const response = await client.fetch(objectUrl(internalEndpoint, key, {}, bucket), {
+    method: 'PUT',
+    body,
+    headers: { 'content-type': 'application/json' },
+  });
+  if (!response.ok) throw new Error(`journal PUT ${response.status}`);
 }

@@ -282,6 +282,12 @@ route('GET', /^\/v1\/admin\/budget$/, async ({ req, requestId }) => {
   return json(req, requestId, 200, { ...budget, ai_enabled: aiEnabled() });
 });
 
+// Redacted operational health for the owner: counts and heartbeat times only.
+route('GET', /^\/v1\/admin\/operations$/, async ({ req, requestId }) => {
+  const { userId } = await requireCaller(req);
+  return json(req, requestId, 200, await callService('svc_admin_operations', { p_actor_id: userId }));
+});
+
 route('PATCH', /^\/v1\/admin\/budget$/, async ({ req, requestId }) => {
   const { userId } = await requireCaller(req);
   const key = idempotencyKey(req);

@@ -1,6 +1,6 @@
 // Deletion processing shared by the API (right after a request) and maintenance.
 import { serviceClient } from './service.ts';
-import { deleteObject } from './storage.ts';
+import { bucketName, deleteObject, listObjects, putJournalEntry } from './storage.ts';
 
 /** Deletes due objects and confirms absence before completing each task. */
 export async function processMediaDeletion(limit = 100) {
@@ -24,9 +24,29 @@ export async function processMediaDeletion(limit = 100) {
   return { claimed: (data ?? []).length, deleted, failed };
 }
 
+/** Copies new deletion journal rows to the external journal bucket, oldest first. */
+export async function exportDeletionJournal() {
+  const db = serviceClient();
+  const { data, error } = await db.rpc('svc_unexported_journal', { p_limit: 100 });
+  if (error) throw new Error(`journal read failed: ${error.code}`);
+  const exported: number[] = [];
+  for (const row of (data ?? []) as Array<{ id: number; kind: string; subject_id: string; recorded_at: string }>) {
+    const body = JSON.stringify({ kind: row.kind, subject_id: row.subject_id, recorded_at: row.recorded_at });
+    await putJournalEntry(`deletions/${row.recorded_at.slice(0, 10)}/${String(row.id).padStart(12, '0')}.json`, body);
+    exported.push(row.id);
+  }
+  if (exported.length > 0) {
+    const { error: markError } = await db.rpc('svc_mark_journal_exported', { p_ids: exported });
+    if (markError) throw new Error(`journal mark failed: ${markError.code}`);
+  }
+  return exported.length;
+}
+
 /** Removes Auth identities whose stored objects are all confirmed absent. */
 export async function processAccountDeletions() {
   const db = serviceClient();
+  // The journal entry leaves the database before anything is removed.
+  const journaled = await exportDeletionJournal();
   const media = await processMediaDeletion();
   const { data, error } = await db.rpc('svc_account_deletions_ready', { p_limit: 20 });
   if (error) throw new Error(`deletions failed: ${error.code}`);
@@ -40,9 +60,43 @@ export async function processAccountDeletions() {
     else completed += 1;
   }
   return {
+    journal_exported: journaled,
     objects_deleted: media.deleted,
     objects_failed: media.failed,
     accounts_completed: completed,
     accounts_failed: failed,
   };
+}
+
+/** Five-minute temporary cleanup: expire abandoned uploads, then delete due objects. */
+export async function temporaryCleanup() {
+  const { data, error } = await serviceClient().rpc('svc_temporary_cleanup', { p_limit: 200 });
+  if (error) throw new Error(`cleanup failed: ${error.code}`);
+  const media = await processMediaDeletion();
+  const summary = data as { uploads_expired: number; records_purged: number };
+  return { ...summary, objects_deleted: media.deleted, objects_failed: media.failed };
+}
+
+// Newer keys may be worker output whose completion has not been recorded yet.
+const ORPHAN_GRACE_MS = 6 * 60 * 60 * 1000;
+
+/** Daily reconciliation of the private bucket against the object registry. */
+export async function reconcileOrphans() {
+  const startedAt = new Date();
+  const objects = await listObjects();
+  const cutoff = startedAt.getTime() - ORPHAN_GRACE_MS;
+  const { data, error } = await serviceClient().rpc('svc_reconcile_storage', {
+    p_bucket: bucketName(),
+    p_listed_keys: objects.map((o) => o.key),
+    p_orphan_candidates: objects.filter((o) => o.lastModified < cutoff).map((o) => o.key),
+    p_listing_started_at: startedAt.toISOString(),
+  });
+  if (error) throw new Error(`reconcile failed: ${error.code}`);
+  const result = data as { orphans_queued: number; originals_missing: number };
+  if (result.originals_missing > 0) {
+    // Safe operational alert: a count only.
+    console.warn(JSON.stringify({ alert: 'originals_missing', count: result.originals_missing }));
+  }
+  const media = await processMediaDeletion();
+  return { listed: objects.length, ...result, objects_deleted: media.deleted };
 }

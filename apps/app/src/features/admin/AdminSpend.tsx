@@ -50,6 +50,9 @@ export function AdminSpend({ userId }: { userId: string }) {
       {settings.paused_reason === 'over_reservation' ? (
         <Banner tone="error" message="AI is paused: a charge was higher than its reservation. Review usage, then resume deliberately." />
       ) : null}
+      {settings.paused_reason === 'restore' ? (
+        <Banner tone="warning" message="AI is paused after a database restore. Check recent usage, then resume deliberately." />
+      ) : null}
       {!budget.data.ai_enabled ? (
         <Banner tone="warning" message="AI is turned off for this environment. Manual features keep working." />
       ) : null}

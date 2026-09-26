@@ -126,5 +126,8 @@ Run from the repository root. Prerequisites: Node 22, pnpm 10, uv, Docker. Setup
 | Worker tests (pytest) | `pnpm worker:test` |
 | Regenerate worker JSON contracts | `pnpm contracts:generate` (drift fails `pnpm test:unit`) |
 | Owner bootstrap (operator) | `DATABASE_URL=... pnpm ops:bootstrap-owner --user-id <uuid>` |
+| Recover missed maintenance (operator) | `pnpm ops:recover-maintenance` ([docs/runbooks/operations.md](docs/runbooks/operations.md)) |
+| Encrypted DB export / restore rehearsal (operator) | `pnpm ops:backup-db` / `pnpm ops:restore-rehearsal` ([docs/runbooks/backup-restore.md](docs/runbooks/backup-restore.md)) |
+| CI | `.github/workflows/ci.yml` runs `pnpm check`, then the stack suites above; promotion and rollback in [docs/runbooks/deploy.md](docs/runbooks/deploy.md) |
 
 Use `npx expo install <pkg>` inside `apps/app` to add Expo/React Native packages at SDK-compatible versions.

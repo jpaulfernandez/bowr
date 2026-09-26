@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { disposeAccountResources } from './account-lifecycle';
+import { identifyAnalytics } from './analytics';
 import { clearAccountStorage } from './account-storage';
 import { supabase } from './supabase';
 
@@ -35,6 +36,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // Account change: stop private work and dispose every cached response
         // before anything renders under the new identity.
         currentUserId = nextUserId;
+        identifyAnalytics(nextUserId);
         void queryClient.cancelQueries();
         queryClient.clear();
         disposeAccountResources();
