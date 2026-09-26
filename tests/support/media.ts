@@ -58,3 +58,20 @@ export async function createSlot(token: string, bytes: Buffer, contentType: stri
 export async function putSlot(entry: { upload: { url: string; headers: Record<string, string> } }, bytes: Buffer) {
   return fetch(entry.upload.url, { method: 'PUT', headers: entry.upload.headers, body: bytes });
 }
+
+/**
+ * WARDROBE photo fixtures, generated synthetically by the worker's helpers:
+ * a garment on a plain background and a blank photo in which no garment can be found. No real photos are committed.
+ */
+export function wardrobeFixtures(): Record<'garment' | 'blank', Buffer> {
+  const script = `
+import base64, json
+from PIL import Image
+from tests.conftest import encode, garment
+print(json.dumps({k: base64.b64encode(v).decode() for k, v in {
+  "garment": encode(garment(), "PNG"),
+  "blank": encode(Image.new("RGB", (640, 480), (200, 200, 200)), "PNG"),
+}.items()}))`;
+  const output = execFileSync('uv', ['run', 'python', '-c', script], { cwd: 'services/worker', encoding: 'utf8' });
+  return Object.fromEntries(Object.entries(JSON.parse(output)).map(([k, v]) => [k, Buffer.from(v as string, 'base64')])) as never;
+}

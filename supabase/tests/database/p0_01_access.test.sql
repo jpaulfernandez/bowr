@@ -39,13 +39,14 @@ select is(
   (select coalesce(array_agg(g order by g), '{}') from (select format('%s:%s:%s', grantee, table_name, privilege_type) as g
      from information_schema.role_table_grants
     where table_schema = 'public' and grantee in ('anon', 'authenticated')) grants),
-  array['authenticated:media_assets:SELECT', 'authenticated:upload_batches:SELECT', 'authenticated:upload_entries:SELECT'],
+  array['authenticated:item_assets:SELECT', 'authenticated:item_stages:SELECT', 'authenticated:items:SELECT',
+    'authenticated:media_assets:SELECT', 'authenticated:upload_batches:SELECT', 'authenticated:upload_entries:SELECT'],
   'table-wide grants to anon/authenticated in public are exactly the owner-filtered reads');
 select is(
   (select array_agg(p.proname::text order by p.proname)
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')),
-  array['get_bootstrap', 'update_profile'], 'authenticated executes only allowlisted public functions');
+  array['get_bootstrap', 'update_item', 'update_profile'], 'authenticated executes only allowlisted public functions');
 select is(
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')),

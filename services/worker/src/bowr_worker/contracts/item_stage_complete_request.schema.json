@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "type": "number",
+          "const": 1
+        },
+        "lease_generation": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "outcome": {
+          "type": "string",
+          "const": "ready"
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "cutout": {
+              "type": "object",
+              "properties": {
+                "width": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1024
+                },
+                "height": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1024
+                },
+                "byte_size": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              },
+              "required": [
+                "width",
+                "height",
+                "byte_size",
+                "sha256"
+              ],
+              "additionalProperties": false
+            },
+            "thumbnail": {
+              "type": "object",
+              "properties": {
+                "width": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 256
+                },
+                "height": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 256
+                },
+                "byte_size": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              },
+              "required": [
+                "width",
+                "height",
+                "byte_size",
+                "sha256"
+              ],
+              "additionalProperties": false
+            },
+            "mask": {
+              "type": "object",
+              "properties": {
+                "width": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1024
+                },
+                "height": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1024
+                },
+                "byte_size": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              },
+              "required": [
+                "width",
+                "height",
+                "byte_size",
+                "sha256"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "cutout",
+            "thumbnail",
+            "mask"
+          ],
+          "additionalProperties": false
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "foreground_ratio": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": [
+            "foreground_ratio"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "lease_generation",
+        "outcome",
+        "outputs",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "type": "number",
+          "const": 1
+        },
+        "lease_generation": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "outcome": {
+          "type": "string",
+          "const": "rejected"
+        },
+        "failure_code": {
+          "type": "string",
+          "enum": [
+            "NO_FOREGROUND",
+            "SOURCE_MISSING",
+            "CORRUPT_IMAGE",
+            "MODEL_UNAVAILABLE"
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "lease_generation",
+        "outcome",
+        "failure_code"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

@@ -61,3 +61,35 @@ def webp_chunks(data: bytes) -> list[str]:
         chunks.append(name)
         offset += 8 + size + (size % 2)
     return chunks
+
+
+def garment(
+    width: int = 800, height: int = 600, background: tuple[int, int, int] = (232, 229, 222)
+) -> Image.Image:
+    """A navy shirt silhouette on a plain light background (a hanger-style photo)."""
+    from PIL import ImageDraw
+
+    image = Image.new("RGB", (width, height), background)
+    sx, sy = width / 800, height / 600
+    points = [
+        (300, 110),
+        (500, 110),
+        (600, 200),
+        (555, 250),
+        (500, 215),
+        (500, 520),
+        (300, 520),
+        (300, 215),
+        (245, 250),
+        (200, 200),
+    ]
+    ImageDraw.Draw(image).polygon([(x * sx, y * sy) for x, y in points], fill=(31, 42, 77))
+    return image
+
+
+def garment_truth(width: int = 800, height: int = 600) -> list[list[bool]]:
+    """Pixel truth for ``garment()``: True where the shirt is."""
+    import numpy as np
+
+    pixels = np.asarray(garment(width, height)).astype(int)
+    return (pixels[:, :, 0] < 100) & (pixels[:, :, 2] > 60)

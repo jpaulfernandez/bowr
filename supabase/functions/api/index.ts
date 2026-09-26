@@ -196,6 +196,30 @@ route('GET', /^\/v1\/upload-entries\/([^/]+)\/status$/, async ({ req, requestId,
   );
 });
 
+// --- Items -------------------------------------------------------------------
+
+const ITEM_STAGES = ['cutout'];
+
+// Owner retries a failed or interrupted stage for the item's current media revision.
+route('POST', /^\/v1\/items\/([^/]+)\/process$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  const body = await jsonBody(req, ['stage', 'media_revision']);
+  if (typeof body.stage !== 'string' || !ITEM_STAGES.includes(body.stage)) {
+    throw appError(422, 'VALIDATION_FAILED', { field: 'stage' });
+  }
+  if (!Number.isSafeInteger(body.media_revision)) throw appError(422, 'VALIDATION_FAILED', { field: 'media_revision' });
+  const result = (await callService('svc_retry_item_stage', {
+    p_user_id: userId,
+    p_item_id: params[0],
+    p_stage: body.stage,
+    p_media_revision: body.media_revision,
+  })) as { job_id: string };
+  afterResponse(dispatchJob(result.job_id));
+  return json(req, requestId, 202, { ...result, poll_after_ms: 2000 });
+});
+
 route('POST', /^\/v1\/media\/access$/, async ({ req, requestId }) => {
   const { userId } = await requireCaller(req);
   const body = await jsonBody(req, ['requests']);

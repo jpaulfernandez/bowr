@@ -111,7 +111,7 @@ Run from the repository root. Prerequisites: Node 22, pnpm 10, uv, Docker. Setup
 
 | Purpose | Command |
 | --- | --- |
-| Install | `pnpm install` and `(cd services/worker && uv sync)` |
+| Install | `pnpm install`, `(cd services/worker && uv sync)` and `pnpm worker:models` (pinned, checksum-verified weights) |
 | Fast checks (lint, types, unit, worker) | `pnpm check` |
 | Lint | `pnpm lint` (ESLint, `deno lint`/`fmt --check` for Edge Functions, ruff) |
 | Type-check | `pnpm typecheck` (app, packages, Edge Functions via `deno check`) |

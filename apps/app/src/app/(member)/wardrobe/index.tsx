@@ -1,10 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, router } from 'expo-router';
+import { useState } from 'react';
 import { Text as RNText, View } from 'react-native';
 import { z } from 'zod';
+import { Banner } from '../../../components/Banner';
 import { Button } from '../../../components/Button';
 import { Prose, Screen } from '../../../components/Screen';
 import { Heading, Text } from '../../../components/Text';
+import { PieceTile } from '../../../features/items/PieceTile';
+import { useBowerItems, useItemCount } from '../../../features/items/queries';
 import { guardedRead } from '../../../lib/api';
 import { formatDateTime } from '../../../lib/format';
 import { userKeys } from '../../../lib/query-keys';
@@ -13,8 +17,20 @@ import { supabase } from '../../../lib/supabase';
 
 const Batches = z.array(z.object({ id: z.string().uuid(), entry_count: z.number().int(), created_at: z.string() }));
 
+const GAP = 12;
+const MIN_TILE = 152;
+
+/** Columns from the actual available width: at least two, tiles near 152 px (DESIGN 5.3). */
+function grid(width: number) {
+  const columns = Math.max(2, Math.floor((width + GAP) / (MIN_TILE + GAP)));
+  return { columns, size: Math.floor((width - GAP * (columns - 1)) / columns) };
+}
+
 export default function Bower() {
   const { userId } = useSession();
+  const items = useBowerItems();
+  const count = useItemCount();
+  const [width, setWidth] = useState(0);
   const receipts = useQuery({
     queryKey: [...userKeys.all(userId ?? 'none'), 'upload-batches', 'recent'],
     queryFn: async ({ signal }) =>
@@ -32,14 +48,47 @@ export default function Bower() {
     enabled: userId !== null,
   });
 
+  const pieces = items.data?.pages.flat() ?? [];
+  const total = count.data;
+  const subtitle = total === undefined ? 'Your wardrobe' : `Your wardrobe · ${total} ${total === 1 ? 'piece' : 'pieces'}`;
+  const { size } = grid(width);
+
   return (
-    <Screen title="Bower" subtitle="Your wardrobe">
+    <Screen title="Bower" subtitle={subtitle}>
       <View className="max-w-prose gap-3">
         <Button label="Gather" onPress={() => router.push('/wardrobe/gather')} />
       </View>
-      <Prose>
-        <Text>Your Bower is empty. Pieces you add will appear here, visible only to you.</Text>
-      </Prose>
+      {items.isError ? <Banner tone="error" message="Your pieces couldn't load. Check your connection and try again." /> : null}
+      {items.isSuccess && pieces.length === 0 ? (
+        <Prose>
+          <Text>Your Bower is empty. Gather your first piece.</Text>
+          <Text variant="secondary">Start with a few pieces you wear often. Pieces you add are visible only to you.</Text>
+        </Prose>
+      ) : null}
+      {pieces.length > 0 ? (
+        <View className="gap-4" onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+          <Heading level={2}>Pieces</Heading>
+          {width > 0 ? (
+            <View role="list" aria-label="Pieces" className="flex-row flex-wrap" style={{ gap: GAP }}>
+              {pieces.map((item) => (
+                <PieceTile key={item.id} item={item} size={size} />
+              ))}
+            </View>
+          ) : null}
+          {items.hasNextPage ? (
+            <Button
+              label="Show more pieces"
+              variant="secondary"
+              className="self-start"
+              busy={items.isFetchingNextPage}
+              busyLabel="Loading pieces"
+              onPress={() => void items.fetchNextPage()}
+            />
+          ) : (
+            <Text variant="secondary">{`That's everything: ${pieces.length} ${pieces.length === 1 ? 'piece' : 'pieces'}.`}</Text>
+          )}
+        </View>
+      ) : null}
       {receipts.data && receipts.data.length > 0 ? (
         <View className="max-w-prose gap-3">
           <Heading level={2}>Recent uploads</Heading>

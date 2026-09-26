@@ -30,5 +30,20 @@ tasks:
         output_per_mtok_micros: 1500000
 
 # Local models baked into the worker image. Each entry pins a revision and the
-# SHA-256 of the weights; nothing is downloaded at runtime.
-local_models: {}
+# SHA-256 of the weights; nothing is downloaded at runtime. The worker image and
+# `pnpm worker:models` fetch these files at build time and verify the checksum.
+# Cutout choice is provisional until the P1.07 real-photo comparison; the
+# license lines name the upstream model and must be re-verified before staging.
+local_models:
+  # Default cutout (salient-object segmentation, 1024 px input). IS-Net / DIS.
+  isnet_general_use:
+    source: https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx
+    revision: rembg-v0.0.0
+    sha256: 60920e99c45464f2ba57bee2ad08c919a52bbf852739e96947fbb4358c0d964a
+    license: Apache-2.0 (upstream DIS/IS-Net; ONNX export published by rembg, MIT)
+  # Alternate-model retry (U-2-Netp, 320 px input); a different architecture.
+  u2netp:
+    source: https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx
+    revision: rembg-v0.0.0
+    sha256: 309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8
+    license: Apache-2.0 (upstream U-2-Net; ONNX export published by rembg, MIT)

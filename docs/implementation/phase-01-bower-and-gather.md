@@ -16,10 +16,10 @@ Use the existing upload, asset, worker, gateway and cleanup paths. Implement `it
 
 Tasks:
 
-- [ ] **P1.01-T1** Add item/asset relationships and unique upload-entry/part creation identity; implement owner-filtered paginated reads, `update_item`, field provenance, taxonomy and revision conflicts. Preserve all first-class garment/accessory categories.
-- [ ] **P1.01-T2** Connect validated uploads to one visible ordinary item and cutout/mask/thumbnail stages. Produce transparent square 1024 px cutout and 256 px thumbnail from the sanitized original; masked image work uses pinned CPU models.
-- [ ] **P1.01-T3** Build `/wardrobe`, `/wardrobe/gather`, `/wardrobe/uploads/:id`, `/wardrobe/items/:id` with stable tiles, Cutout/Original, editable name/category/colors and collapsed optional metadata. Add guide entry, take/choose photo, rotate/remove and first-upload guidance.
-- [ ] **P1.01-T4** Add Use original, retry stage, manual category and needs-attention states. Eligibility depends on resolved metadata, not all processing succeeding; no AI call is required for manual identification.
+- [x] **P1.01-T1** Add item/asset relationships and unique upload-entry/part creation identity; implement owner-filtered paginated reads, `update_item`, field provenance, taxonomy and revision conflicts. Preserve all first-class garment/accessory categories.
+- [x] **P1.01-T2** Connect validated uploads to one visible ordinary item and cutout/mask/thumbnail stages. Produce transparent square 1024 px cutout and 256 px thumbnail from the sanitized original; masked image work uses pinned CPU models.
+- [x] **P1.01-T3** Build `/wardrobe`, `/wardrobe/gather`, `/wardrobe/uploads/:id`, `/wardrobe/items/:id` with stable tiles, Cutout/Original, editable name/category/colors and collapsed optional metadata. Add guide entry, take/choose photo, rotate/remove and first-upload guidance.
+- [x] **P1.01-T4** Add Use original, retry stage, manual category and needs-attention states. Eligibility depends on resolved metadata, not all processing succeeding; no AI call is required for manual identification.
 
 Acceptance:
 

@@ -12,16 +12,27 @@ import { useSession } from '../../lib/session';
  * the user-scoped query cache. An expired or failed image refreshes authorization
  * once, then shows an image error.
  */
-export function PrivateImage({ assetId, label, size = 96 }: { assetId: string; label: string; size?: number }) {
+export function PrivateImage({
+  assetId,
+  label,
+  size = 96,
+  variant = 'original',
+}: {
+  assetId: string;
+  label: string;
+  size?: number;
+  /** The rendition to show: an asset signs only its own role. */
+  variant?: 'original' | 'cutout' | 'thumbnail' | 'mask';
+}) {
   const { userId } = useSession();
   const refreshed = useRef(false);
   const [failed, setFailed] = useState(false);
   const grant = useQuery({
-    queryKey: [...userKeys.all(userId ?? 'none'), 'media', assetId, 'original'],
+    queryKey: [...userKeys.all(userId ?? 'none'), 'media', assetId, variant],
     queryFn: async ({ signal }) =>
       (await apiRequest('/media/access', {
         method: 'POST',
-        body: { requests: [{ asset_id: assetId, variant: 'original' }] },
+        body: { requests: [{ asset_id: assetId, variant }] },
         schema: MediaGrants,
         signal,
       }))[0]!,

@@ -27,6 +27,7 @@ const Entries = z.array(
     failure_code: z.string().nullable(),
     declared_content_type: z.string(),
     created_at: z.string(),
+    items: z.array(z.object({ id: z.string().uuid() })),
   }),
 );
 type Entry = z.infer<typeof Entries>[number];
@@ -50,7 +51,7 @@ export default function UploadReceipt() {
         await guardedRead(() =>
           supabase
             .from('upload_entries')
-            .select('id, asset_id, state, failure_code, declared_content_type, created_at')
+            .select('id, asset_id, state, failure_code, declared_content_type, created_at, items(id)')
             .eq('batch_id', id)
             .order('created_at')
             .order('id')
@@ -145,6 +146,13 @@ export default function UploadReceipt() {
                 <Text className="text-action text-text">{label}</Text>
                 <Text className={entry.state === 'rejected' || entry.state === 'failed' ? 'text-secondary text-error' : 'text-secondary text-text-secondary'}>{status}</Text>
                 <View className="flex-row flex-wrap gap-2">
+                  {entry.items[0] ? (
+                    <Button
+                      label={`View piece from photo ${index + 1}`}
+                      variant="secondary"
+                      onPress={() => router.push(`/wardrobe/items/${entry.items[0]!.id}`)}
+                    />
+                  ) : null}
                   {task?.status === 'failed' ? (
                     <Button label={`Retry photo ${index + 1}`} variant="secondary" onPress={() => uploadManager.retry(entry.id)} />
                   ) : null}
