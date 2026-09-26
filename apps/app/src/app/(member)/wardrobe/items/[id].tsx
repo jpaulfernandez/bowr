@@ -1,12 +1,13 @@
 import { categoryLabel, displayName, needsCategory } from '@bowr/domain';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { Text as RNText, useWindowDimensions, View } from 'react-native';
 import { Banner } from '../../../../components/Banner';
 import { Button } from '../../../../components/Button';
 import { RadioGroup } from '../../../../components/RadioGroup';
 import { Screen } from '../../../../components/Screen';
 import { Heading, Text } from '../../../../components/Text';
+import { LabelsSection } from '../../../../features/items/LabelsSection';
 import { PieceEditor } from '../../../../features/items/PieceEditor';
 import { PieceImage } from '../../../../features/items/PieceImage';
 import { ProcessingPanel } from '../../../../features/items/ProcessingPanel';
@@ -73,6 +74,11 @@ export default function PieceDetail() {
             Original means the privacy-sanitized copy of your photo: bowr removed its location and camera details and kept it private
             to you.
           </Text>
+          <Link href={`/help/photos${piece.category ? `?category=${piece.category}` : ''}`} className="min-h-target justify-center">
+            <RNText className="text-action text-accent underline">
+              {piece.category ? `Photo tips for ${categoryLabel[piece.category].toLowerCase()}` : 'Photo tips'}
+            </RNText>
+          </Link>
         </View>
 
         <View className="min-w-0 flex-1 basis-[320px] gap-6">
@@ -119,6 +125,7 @@ export default function PieceDetail() {
           <ProcessingPanel item={piece} />
           <Heading level={2}>Details</Heading>
           <PieceEditor key={piece.id} item={piece} />
+          <LabelsSection item={piece} />
         </View>
       </View>
       <Button label="Back to Bower" variant="quiet" className="self-start" onPress={() => router.replace('/wardrobe')} />

@@ -18,7 +18,7 @@ export const FieldMeta = z.record(
   }),
 );
 
-export const StageName = z.enum(['cutout', 'colors', 'embedding', 'tags']);
+export const StageName = z.enum(['cutout', 'colors', 'embedding', 'tags', 'label']);
 export const StageState = z.enum(['queued', 'running', 'retry_wait', 'blocked_budget', 'succeeded', 'failed', 'canceled']);
 
 export const ItemStage = z.object({

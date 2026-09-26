@@ -72,9 +72,14 @@ export async function processAccountDeletions() {
 export async function temporaryCleanup() {
   const { data, error } = await serviceClient().rpc('svc_temporary_cleanup', { p_limit: 200 });
   if (error) throw new Error(`cleanup failed: ${error.code}`);
+  // Care labels whose garment never became a piece are not kept.
+  const { data: labels, error: labelError } = await serviceClient().rpc('svc_expire_unattached_labels', {
+    p_limit: 200,
+  });
+  if (labelError) throw new Error(`label cleanup failed: ${labelError.code}`);
   const media = await processMediaDeletion();
   const summary = data as { uploads_expired: number; records_purged: number };
-  return { ...summary, objects_deleted: media.deleted, objects_failed: media.failed };
+  return { ...summary, labels_expired: labels as number, objects_deleted: media.deleted, objects_failed: media.failed };
 }
 
 // Newer keys may be worker output whose completion has not been recorded yet.

@@ -113,14 +113,14 @@ export const EmbeddingClaim = z
   .strict();
 
 /**
- * Structured tags. The worker only asks the internal gateway to run this job;
+ * Structured tags or a care-label reading. The worker only asks the internal gateway to run this job;
  * it never sees the prompt, the model or the photo sent to the provider.
  */
 export const TagsClaim = z
   .object({
     ...stageClaimBase,
-    stage: z.literal('tags'),
-    input: z.object({ task: z.literal('item_tags') }).strict(),
+    stage: z.enum(['tags', 'label']),
+    input: z.object({ task: z.enum(['item_tags', 'label_read']) }).strict(),
     sources: z.object({}).strict(),
     outputs: z.object({}).strict(),
   })

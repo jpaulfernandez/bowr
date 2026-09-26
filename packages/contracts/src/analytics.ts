@@ -19,6 +19,7 @@ export const routeTemplates = [
   '/wardrobe/gather',
   '/wardrobe/uploads/:id',
   '/wardrobe/items/:id',
+  '/help/photos',
   '/more',
   '/admin',
   '/settings',

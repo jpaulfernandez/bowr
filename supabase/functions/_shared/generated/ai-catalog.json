@@ -42,6 +42,27 @@
           "output_per_mtok_micros": 1500000
         }
       ]
+    },
+    "label_read": {
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "prompt_version": "label-read-v1",
+      "output_schema_version": 1,
+      "max_input_tokens": 20000,
+      "max_output_tokens": 256,
+      "thinking": "disabled",
+      "safety_margin_percent": 10,
+      "lighter": {
+        "model": "gemini-3.1-flash-lite",
+        "max_output_tokens": 256
+      },
+      "prices": [
+        {
+          "effective_from": "2026-01-01",
+          "input_per_mtok_micros": 250000,
+          "output_per_mtok_micros": 1500000
+        }
+      ]
     }
   }
 }

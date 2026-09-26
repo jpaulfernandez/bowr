@@ -4,7 +4,7 @@ import { requireCaller } from '../_shared/auth.ts';
 import { appError, errorResponse, fromDatabaseError, json, preflight } from '../_shared/http.ts';
 import { sha256Hex } from '../_shared/capability.ts';
 import { afterResponse, dispatchJob } from '../_shared/dispatch.ts';
-import { processAccountDeletions } from '../_shared/lifecycle.ts';
+import { processAccountDeletions, processMediaDeletion } from '../_shared/lifecycle.ts';
 import { clientIpHash, generateInviteCode, inviteDigest } from '../_shared/invite-codes.ts';
 import { serviceClient } from '../_shared/service.ts';
 import { bucketName, headObject, presignGet, presignPut } from '../_shared/storage.ts';
@@ -89,9 +89,13 @@ route('POST', /^\/v1\/upload-batches$/, async ({ req, requestId }) => {
   const files = body.files.map((file: unknown) => {
     const f = (file ?? {}) as Record<string, unknown>;
     const unexpected = Object.keys(f).filter((k) =>
-      !['client_file_id', 'purpose', 'content_type', 'byte_size', 'rotation'].includes(k)
+      !['client_file_id', 'purpose', 'content_type', 'byte_size', 'rotation', 'label_for', 'target_item_id'].includes(k)
     );
-    if (unexpected.length > 0 || !isUuid(f.client_file_id)) {
+    if (
+      unexpected.length > 0 || !isUuid(f.client_file_id) ||
+      (f.label_for !== undefined && !isUuid(f.label_for)) ||
+      (f.target_item_id !== undefined && !isUuid(f.target_item_id))
+    ) {
       throw appError(422, 'VALIDATION_FAILED', {
         field: 'files',
         reason: unexpected.length > 0 ? 'unexpected_fields' : 'client_file_id',
@@ -106,6 +110,9 @@ route('POST', /^\/v1\/upload-batches$/, async ({ req, requestId }) => {
       content_type: f.content_type,
       byte_size: f.byte_size,
       rotation: f.rotation ?? 0,
+      // A care label names its garment in this batch or an existing piece.
+      ...(f.label_for !== undefined ? { label_for: String(f.label_for).toLowerCase() } : {}),
+      ...(f.target_item_id !== undefined ? { target_item_id: String(f.target_item_id).toLowerCase() } : {}),
     };
   });
   const batch = (await callService('svc_create_upload_batch', {
@@ -198,7 +205,7 @@ route('GET', /^\/v1\/upload-entries\/([^/]+)\/status$/, async ({ req, requestId,
 
 // --- Items -------------------------------------------------------------------
 
-const ITEM_STAGES = ['cutout', 'colors', 'embedding', 'tags'];
+const ITEM_STAGES = ['cutout', 'colors', 'embedding', 'tags', 'label'];
 
 // Owner retries a failed or interrupted stage for the item's current media revision.
 route('POST', /^\/v1\/items\/([^/]+)\/process$/, async ({ req, requestId, params }) => {
@@ -218,6 +225,16 @@ route('POST', /^\/v1\/items\/([^/]+)\/process$/, async ({ req, requestId, params
   })) as { job_id: string };
   afterResponse(dispatchJob(result.job_id));
   return json(req, requestId, 202, { ...result, poll_after_ms: 2000 });
+});
+
+// Removes a care-label attachment; the piece and its values stay.
+route('DELETE', /^\/v1\/media\/([^/]+)$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  const result = await callService('svc_remove_label', { p_user_id: userId, p_asset_id: params[0] });
+  afterResponse(processMediaDeletion());
+  return json(req, requestId, 200, result);
 });
 
 route('POST', /^\/v1\/media\/access$/, async ({ req, requestId }) => {

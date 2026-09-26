@@ -114,6 +114,8 @@ def claim(stage: str) -> dict:
             },
             "sources": {"cutout": {"url": "http://store.test/cutout"}},
         }
+    if stage == "label":
+        return {**base, "input": {"task": "label_read"}, "sources": {}}
     return {**base, "input": {"task": "item_tags"}, "sources": {}}
 
 
@@ -151,10 +153,11 @@ def test_local_stages_download_the_cutout_and_complete_with_a_valid_result(stage
         assert body["result"]["suggested"]["colors"][0]["name"] == "navy"
 
 
-def test_the_tag_stage_only_asks_the_gateway_to_run_it_and_never_completes_itself() -> None:
-    validate("worker_claim_response", claim("tags"))
+@pytest.mark.parametrize("stage", ["tags", "label"])
+def test_ai_stages_only_ask_the_gateway_to_run_them_and_never_complete_themselves(stage: str) -> None:
+    validate("worker_claim_response", claim(stage))
     calls: list[httpx.Request] = []
-    with httpx.Client(transport=transport("tags", calls)) as client:
+    with httpx.Client(transport=transport(stage, calls)) as client:
         assert (
             run_job({"job_id": JOB_ID, "claim_token": "c" * 64}, "http://internal.test", client)
             == "ai:blocked"

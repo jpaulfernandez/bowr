@@ -104,3 +104,16 @@ def trousers(width: int = 800, height: int = 600) -> Image.Image:
     points = [(320, 80), (480, 80), (500, 540), (420, 540), (400, 250), (380, 540), (300, 540)]
     ImageDraw.Draw(image).polygon([(x * sx, y * sy) for x, y in points], fill=(110, 75, 50))
     return image
+
+
+def care_label(width: int = 600, height: int = 400) -> Image.Image:
+    """A white care label with dark printed lines (no real text or brand)."""
+    from PIL import ImageDraw
+
+    image = Image.new("RGB", (width, height), (40, 40, 44))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((100, 60, 500, 340), fill=(248, 248, 244))
+    for row in range(6):
+        y = 90 + row * 40
+        draw.rectangle((130, y, 470 - (row % 3) * 60, y + 12), fill=(30, 30, 30))
+    return image

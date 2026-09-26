@@ -54,10 +54,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P1.03-T1** Expand the Gather queue to 20 source photos including labels, three concurrent uploads, thumbnail rotate/remove/add, per-file progress and uploaded-versus-unsent distinction. Desktop drop is optional beside file input.
-- [ ] **P1.03-T2** Implement optional care-label attachment to a selected queue garment or existing item, independent label reading and editable brand/size/material. A label never creates another wardrobe piece.
-- [ ] **P1.03-T3** Deliver `/help/photos` with hanger/flat-lay and shoe, shades, hat, bag, belt, watch/jewelry guidance from the PRD. Make guidance reopenable and category-specific; no native framing outline until phase 8.
-- [ ] **P1.03-T4** Add batch review and needs-attention filtering; successful ordinary tags do not need mandatory approval. Resume uploaded work by batch ID; retry only failed entries and keep stable source identities.
+- [x] **P1.03-T1** Expand the Gather queue to 20 source photos including labels, three concurrent uploads, thumbnail rotate/remove/add, per-file progress and uploaded-versus-unsent distinction. Desktop drop is optional beside file input.
+- [x] **P1.03-T2** Implement optional care-label attachment to a selected queue garment or existing item, independent label reading and editable brand/size/material. A label never creates another wardrobe piece.
+- [x] **P1.03-T3** Deliver `/help/photos` with hanger/flat-lay and shoe, shades, hat, bag, belt, watch/jewelry guidance from the PRD. Make guidance reopenable and category-specific; no native framing outline until phase 8.
+- [x] **P1.03-T4** Add batch review and needs-attention filtering; successful ordinary tags do not need mandatory approval. Resume uploaded work by batch ID; retry only failed entries and keep stable source identities.
 
 Acceptance:
 

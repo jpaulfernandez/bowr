@@ -4,7 +4,7 @@
 //
 //   node scripts/dev/fake-gemini.mjs            (port 8790)
 //   GET  /__calls   -> { count_tokens, generate_content, last_models }
-//   POST /__control -> { mode, delay_ms?, output_tokens?, tags? }
+//   POST /__control -> { mode, delay_ms?, output_tokens?, tags?, label? }
 //   POST /__reset
 // Modes: ok | timeout | reject_400 | quota_429 | server_500 | overcharge | invalid_output
 // A request whose text starts the item-tags prompt ("bowr:item_tags") gets the
@@ -22,8 +22,9 @@ const DEFAULT_TAGS = {
   seasons: ['hot', 'mild'],
   style_tags: ['minimal'],
 };
+const DEFAULT_LABEL = { brand: 'Uniqlo', size_label: 'M', material: '100% cotton' };
 let calls = { count_tokens: 0, generate_content: 0, last_models: [], last_had_image: false };
-let control = { mode: 'ok', delay_ms: 0, output_tokens: 5, tags: DEFAULT_TAGS };
+let control = { mode: 'ok', delay_ms: 0, output_tokens: 5, tags: DEFAULT_TAGS, label: DEFAULT_LABEL };
 
 const send = (res, status, body) => {
   res.writeHead(status, { 'content-type': 'application/json' });
@@ -53,7 +54,7 @@ http
       if (path === '/__calls') return send(res, 200, calls);
       if (path === '/__reset') {
         calls = { count_tokens: 0, generate_content: 0, last_models: [], last_had_image: false };
-        control = { mode: 'ok', delay_ms: 0, output_tokens: 5, tags: DEFAULT_TAGS };
+        control = { mode: 'ok', delay_ms: 0, output_tokens: 5, tags: DEFAULT_TAGS, label: DEFAULT_LABEL };
         return send(res, 200, { ok: true });
       }
       if (path === '/__control') {
@@ -92,6 +93,8 @@ http
             ? 'not json'
             : request.text.startsWith('bowr:item_tags')
             ? JSON.stringify(control.tags)
+            : request.text.startsWith('bowr:label_read')
+            ? JSON.stringify(control.label)
             : '{"ok":true}';
           return send(res, 200, {
             candidates: [{ content: { role: 'model', parts: [{ text }] }, finishReason: 'STOP' }],

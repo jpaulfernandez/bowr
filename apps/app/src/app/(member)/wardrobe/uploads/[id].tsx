@@ -27,6 +27,9 @@ const Entries = z.array(
     failure_code: z.string().nullable(),
     declared_content_type: z.string(),
     created_at: z.string(),
+    purpose: z.enum(['garment', 'care_label']),
+    parent_entry_id: z.string().uuid().nullable(),
+    target_item_id: z.string().uuid().nullable(),
     items: z.array(z.object({ id: z.string().uuid() })),
   }),
 );
@@ -51,7 +54,7 @@ export default function UploadReceipt() {
         await guardedRead(() =>
           supabase
             .from('upload_entries')
-            .select('id, asset_id, state, failure_code, declared_content_type, created_at, items(id)')
+            .select('id, asset_id, state, failure_code, declared_content_type, created_at, purpose, parent_entry_id, target_item_id, items!items_user_id_source_entry_id_fkey(id)')
             .eq('batch_id', id)
             .order('created_at')
             .order('id')
@@ -75,6 +78,24 @@ export default function UploadReceipt() {
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });
+
+  // Where each ready care label is attached (labels never become pieces).
+  const labelAssets = (entries.data ?? []).filter((e) => e.purpose === 'care_label' && e.state === 'ready').map((e) => e.asset_id);
+  const attachments = useQuery({
+    queryKey: [...key, 'labels', labelAssets.join(',')],
+    queryFn: async ({ signal }) =>
+      z
+        .array(z.object({ asset_id: z.string().uuid(), item_id: z.string().uuid() }))
+        .parse(
+          await guardedRead(() =>
+            supabase.from('item_assets').select('asset_id, item_id').in('asset_id', labelAssets).is('detached_at', null).abortSignal(signal),
+          ),
+        ),
+    enabled: userId !== null && labelAssets.length > 0,
+    refetchInterval: 3000,
+    refetchIntervalInBackground: false,
+  });
+  const [attentionOnly, setAttentionOnly] = useState(false);
 
   const cancel = useMutation({
     mutationFn: (entryId: string) =>
@@ -107,12 +128,26 @@ export default function UploadReceipt() {
     uploadManager.reselect(entry.id, { file: picked.file, name: picked.name });
   };
 
-  const rows = entries.data ?? [];
+  const allRows = entries.data ?? [];
+  const numberOf = (entryId: string) => allRows.findIndex((e) => e.id === entryId) + 1;
+  const labelState = (entry: Entry): 'attached' | 'waiting' | 'unattached' | null => {
+    if (entry.purpose !== 'care_label' || entry.state !== 'ready') return null;
+    if (attachments.data?.some((a) => a.asset_id === entry.asset_id)) return 'attached';
+    const parent = allRows.find((e) => e.id === entry.parent_entry_id);
+    return parent && ['rejected', 'failed', 'canceled'].includes(parent.state) ? 'unattached' : 'waiting';
+  };
+  const needsAttention = (entry: Entry) =>
+    entry.state === 'rejected' ||
+    entry.state === 'failed' ||
+    labelState(entry) === 'unattached' ||
+    (entry.state === 'awaiting_upload' && (!local.has(entry.id) || local.get(entry.id)?.status === 'failed'));
+  const rows = allRows;
   const sending = rows.filter((e) => e.state === 'awaiting_upload' && local.has(e.id) && local.get(e.id)!.status !== 'failed');
   const uploaded = rows.filter((e) => e.state !== 'awaiting_upload' && e.state !== 'canceled').length;
   const checking = rows.filter(inProgress).length;
   const ready = rows.filter((e) => e.state === 'ready').length;
-  const attention = rows.filter((e) => e.state === 'rejected' || e.state === 'failed' || (e.state === 'awaiting_upload' && (!local.has(e.id) || local.get(e.id)?.status === 'failed'))).length;
+  const attention = rows.filter(needsAttention).length;
+  const shown = attentionOnly ? rows.filter(needsAttention) : rows;
 
   const summary =
     sending.length > 0
@@ -130,11 +165,30 @@ export default function UploadReceipt() {
           {summary}
         </Text>
       ) : null}
+      {attention > 0 || attentionOnly ? (
+        <Button
+          label={attentionOnly ? 'Show all photos' : `Show only photos that need attention (${attention})`}
+          variant="secondary"
+          className="self-start"
+          onPress={() => setAttentionOnly((only) => !only)}
+        />
+      ) : null}
       <View role="list" aria-label="Photos in this upload" className="max-w-prose overflow-hidden rounded-control border border-divider bg-surface">
-        {rows.map((entry, index) => {
+        {shown.map((entry, index) => {
           const task = local.get(entry.id);
-          const label = `Photo ${index + 1}${task ? `: ${task.name}` : ''}`;
-          const status = entryStatus(entry.state, task, entry.failure_code);
+          const number = numberOf(entry.id);
+          const label = `Photo ${number}${task ? `: ${task.name}` : ''}${entry.purpose === 'care_label' ? ' (care label)' : ''}`;
+          const attached = labelState(entry);
+          const status =
+            attached === 'attached'
+              ? 'Care label attached to its piece'
+              : attached === 'waiting'
+                ? entry.parent_entry_id
+                  ? `Uploaded · waiting for its piece (photo ${numberOf(entry.parent_entry_id)})`
+                  : 'Uploaded · attaching to its piece'
+                : attached === 'unattached'
+                  ? "Not attached: its piece's photo couldn't be used. This label will be removed."
+                  : entryStatus(entry.state, task, entry.failure_code);
           return (
             <View role="listitem" key={entry.id} className={`flex-row flex-wrap gap-4 p-4 ${index === 0 ? '' : 'border-t border-divider'}`}>
               {entry.state === 'ready' ? (
@@ -144,24 +198,24 @@ export default function UploadReceipt() {
               )}
               <View className="min-w-0 flex-1 basis-[160px] gap-2">
                 <Text className="text-action text-text">{label}</Text>
-                <Text className={entry.state === 'rejected' || entry.state === 'failed' ? 'text-secondary text-error' : 'text-secondary text-text-secondary'}>{status}</Text>
+                <Text className={needsAttention(entry) ? 'text-secondary text-error' : 'text-secondary text-text-secondary'}>{status}</Text>
                 <View className="flex-row flex-wrap gap-2">
                   {entry.items[0] ? (
                     <Button
-                      label={`View piece from photo ${index + 1}`}
+                      label={`View piece from photo ${number}`}
                       variant="secondary"
                       onPress={() => router.push(`/wardrobe/items/${entry.items[0]!.id}`)}
                     />
                   ) : null}
                   {task?.status === 'failed' ? (
-                    <Button label={`Retry photo ${index + 1}`} variant="secondary" onPress={() => uploadManager.retry(entry.id)} />
+                    <Button label={`Retry photo ${number}`} variant="secondary" onPress={() => uploadManager.retry(entry.id)} />
                   ) : null}
                   {entry.state === 'awaiting_upload' && !task ? (
-                    <Button label={`Choose photo ${index + 1} again`} variant="secondary" onPress={() => void chooseAgain(entry)} />
+                    <Button label={`Choose photo ${number} again`} variant="secondary" onPress={() => void chooseAgain(entry)} />
                   ) : null}
                   {entry.state === 'failed' ? (
                     <Button
-                      label={`Try photo ${index + 1} again`}
+                      label={`Try photo ${number} again`}
                       variant="secondary"
                       busy={retry.isPending && retry.variables === entry.id}
                       onPress={() => retry.mutate(entry.id)}
@@ -169,7 +223,7 @@ export default function UploadReceipt() {
                   ) : null}
                   {['awaiting_upload', 'uploaded', 'validating', 'failed'].includes(entry.state) ? (
                     <Button
-                      label={`Cancel photo ${index + 1}`}
+                      label={`Cancel photo ${number}`}
                       variant="quiet"
                       busy={cancel.isPending && cancel.variables === entry.id}
                       onPress={() => cancel.mutate(entry.id)}

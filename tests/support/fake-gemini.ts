@@ -11,7 +11,7 @@ export const fakeGemini = {
     await fetch(`${BASE}/__control`, { method: 'POST', body: JSON.stringify({ mode }) });
   },
   /** Scripted output for the item-tags task, and an optional response delay. */
-  async control(settings: { tags?: unknown; delay_ms?: number; mode?: FakeMode }) {
+  async control(settings: { tags?: unknown; label?: unknown; delay_ms?: number; mode?: FakeMode }) {
     await fetch(`${BASE}/__control`, { method: 'POST', body: JSON.stringify(settings) });
   },
   async calls(): Promise<{ count_tokens: number; generate_content: number; last_models: string[]; last_had_image: boolean }> {

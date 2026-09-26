@@ -8,7 +8,7 @@ type NavItem = { href: Href; label: string; prefixes: string[] };
 // Only destinations that exist in this phase are shown; no disabled future tabs.
 const items: NavItem[] = [
   { href: '/wardrobe', label: 'Bower', prefixes: ['/wardrobe'] },
-  { href: '/more', label: 'More', prefixes: ['/more', '/settings', '/privacy', '/admin', '/onboarding'] },
+  { href: '/more', label: 'More', prefixes: ['/more', '/settings', '/privacy', '/admin', '/onboarding', '/help'] },
 ];
 
 function isCurrent(pathname: string, prefixes: string[]) {

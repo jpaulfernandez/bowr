@@ -6,6 +6,7 @@ import { runAiTask } from '../_shared/ai-gateway.ts';
 import { appError, errorResponse, fromDatabaseError, json } from '../_shared/http.ts';
 import { imageInfo } from '../_shared/image-bytes.ts';
 import { TAGS_TASK, tagsPrompt, tagsResponseSchema, validateTags } from '../_shared/item-tags.ts';
+import { LABEL_TASK, labelPrompt, labelResponseSchema, validateLabel } from '../_shared/label-read.ts';
 import { serviceClient } from '../_shared/service.ts';
 import { deleteObject, getObject, presignGet, presignPut } from '../_shared/storage.ts';
 import { isUuid, jsonBody } from '../_shared/validate.ts';
@@ -32,8 +33,9 @@ const STAGE_OUTPUTS: Record<string, Record<string, { contentType: 'image/webp' |
   },
   colors: {},
   embedding: {},
-  // Tags have no worker outputs and are completed only by the gateway (runAi).
+  // AI stages have no worker outputs and are completed only by the gateway (runAi).
   tags: {},
+  label: {},
 };
 const EMBEDDING_DIMENSION = 512;
 // A completion carrying a 512-value vector exceeds the default body limit.
@@ -276,8 +278,10 @@ function validVector(value: unknown): boolean {
 async function completeStage(req: Request, requestId: string, jobId: string, body: Record<string, unknown>) {
   const capability = await jobCapability(req, jobId, body);
   const expected = STAGE_OUTPUTS[capability.stage];
-  // A worker cannot submit model output: the tags stage completes only in runAi.
-  if (!expected || capability.stage === 'tags') throw appError(403, 'CAPABILITY_REJECTED');
+  // A worker cannot submit model output: AI stages complete only in runAi.
+  if (!expected || capability.stage === 'tags' || capability.stage === 'label') {
+    throw appError(403, 'CAPABILITY_REJECTED');
+  }
   if (
     body.outcome === 'ready' && capability.stage === 'embedding' &&
     !validVector((body.result as Record<string, unknown> | undefined)?.vector)
@@ -359,7 +363,7 @@ function base64(bytes: Uint8Array): string {
 const BUDGET_REFUSALS = new Set(['budget_stop', 'paused', 'rollover_window']);
 
 /**
- * Runs a claimed tags job through the budget gateway. The worker only names
+ * Runs a claimed AI job (tags or a care-label reading) through the budget gateway. The worker only names
  * the job; the prompt, the photo sent to the provider and the validation are
  * all server-side, and the result applies only to untouched, unlocked fields
  * of the same media revision.
@@ -367,14 +371,19 @@ const BUDGET_REFUSALS = new Set(['budget_stop', 'paused', 'rollover_window']);
 async function runAi(req: Request, requestId: string, jobId: string): Promise<Response> {
   const body = await jsonBody(req, ['schema_version', 'lease_generation']);
   const capability = await jobCapability(req, jobId, body);
-  if (capability.stage !== 'tags') throw appError(403, 'CAPABILITY_REJECTED');
+  if (capability.stage !== 'tags' && capability.stage !== 'label') throw appError(403, 'CAPABILITY_REJECTED');
   const generation = capability.lease_generation;
   const context = (await rpc('svc_item_ai_context', { p_job_id: jobId, p_lease_generation: generation })) as {
     status: 'ok' | 'stale';
+    task: 'item_tags' | 'label_read';
     user_id: string;
     original_key: string | null;
     attempt_key: string;
   };
+  // The task, prompt and schema come from the job's stage, never from the worker.
+  const task = context.task === LABEL_TASK
+    ? { name: LABEL_TASK, prompt: labelPrompt(), schema: labelResponseSchema(), validate: validateLabel }
+    : { name: TAGS_TASK, prompt: tagsPrompt(), schema: tagsResponseSchema(), validate: validateTags };
   if (context.status !== 'ok') return json(req, requestId, 200, { status: 'stale' });
 
   const finish = async (
@@ -397,16 +406,16 @@ async function runAi(req: Request, requestId: string, jobId: string): Promise<Re
     status = 'failed';
   } else {
     const outcome = await runAiTask({
-      task: TAGS_TASK,
+      task: task.name,
       attemptKey: context.attempt_key,
       userId: context.user_id,
       jobId,
-      contents: [{ text: tagsPrompt() }, { inlineData: { mimeType: 'image/webp', data: base64(photo) } }],
-      responseSchema: tagsResponseSchema(),
-      validate: (value) => validateTags(value) !== null,
+      contents: [{ text: task.prompt }, { inlineData: { mimeType: 'image/webp', data: base64(photo) } }],
+      responseSchema: task.schema,
+      validate: (value) => task.validate(value) !== null,
     });
     if (outcome.status === 'completed') {
-      const applied = await finish('ready', { suggested: validateTags(outcome.output) }, null);
+      const applied = await finish('ready', { suggested: task.validate(outcome.output) }, null);
       status = applied.status;
     } else if (outcome.status === 'refused' && BUDGET_REFUSALS.has(outcome.reason)) {
       const blocked = (await rpc('svc_block_item_stage', { p_job_id: jobId, p_lease_generation: generation })) as {

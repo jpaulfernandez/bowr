@@ -49,6 +49,25 @@ tasks:
         input_per_mtok_micros: 250000
         output_per_mtok_micros: 1500000
 
+  # Care-label reading (P1.03): brand, size and material from one label photo.
+  # The output is three short strings, so the output cap is small.
+  label_read:
+    provider: gemini
+    model: gemini-3.1-flash-lite
+    prompt_version: label-read-v1
+    output_schema_version: 1
+    max_input_tokens: 20000
+    max_output_tokens: 256
+    thinking: disabled
+    safety_margin_percent: 10
+    lighter:
+      model: gemini-3.1-flash-lite
+      max_output_tokens: 256
+    prices:
+      - effective_from: "2026-01-01"
+        input_per_mtok_micros: 250000
+        output_per_mtok_micros: 1500000
+
 # Local models baked into the worker image. Each entry pins a revision and the
 # SHA-256 of the weights; nothing is downloaded at runtime. The worker image and
 # `pnpm worker:models` fetch these files at build time and verify the checksum.

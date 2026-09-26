@@ -281,7 +281,7 @@ def run_job(
 
     lease = Lease(job, internal_api, client, heartbeat_seconds)
     lease.start()
-    if item_stage and job["stage"] == "tags":
+    if item_stage and job["stage"] in ("tags", "label"):
         return _run_ai_stage(job, lease, client, internal_api)
     body: dict[str, Any] | None
     try:

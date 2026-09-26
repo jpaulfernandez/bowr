@@ -563,14 +563,20 @@
         },
         "stage": {
           "type": "string",
-          "const": "tags"
+          "enum": [
+            "tags",
+            "label"
+          ]
         },
         "input": {
           "type": "object",
           "properties": {
             "task": {
               "type": "string",
-              "const": "item_tags"
+              "enum": [
+                "item_tags",
+                "label_read"
+              ]
             }
           },
           "required": [

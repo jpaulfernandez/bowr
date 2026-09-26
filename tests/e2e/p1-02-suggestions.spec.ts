@@ -73,6 +73,8 @@ test.describe('P1.02 demo: suggestions fill in without losing edits', () => {
 
   test('at zero AI allowance the piece is still usable and says when tags resume @phone', async ({ page }) => {
     await sql()`update private.budget_settings set lighter_micros = 0, stop_micros = 0`;
+    // Other spec files' calls may still be counted; this test measures only its own.
+    await fakeGemini.reset();
     const a = await createIdentity('suggest-zero');
     await signIn(page, a.email);
     await gatherShirt(page);
