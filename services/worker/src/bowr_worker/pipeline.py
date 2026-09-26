@@ -1,4 +1,7 @@
-"""One validation job: claim, fetch, normalize, upload, complete.
+"""One job: claim, fetch, compute, upload, complete.
+
+Validation normalizes an upload into a sanitized original; an item stage
+(cutout) derives renditions from that original.
 
 The worker holds no database, provider or bucket credentials. It receives a
 single-use claim token, exchanges it for a job-scoped capability and exact signed
@@ -8,14 +11,21 @@ URLs are never logged.
 
 from __future__ import annotations
 
+import io
 import logging
 import threading
 from collections.abc import Callable
 from typing import Any
 
 import httpx
+from PIL import Image
 
+from . import models
+from .colors import dominant_colors
+from .cutout import cutout, cutout_from_mask
+from .embedding import embed
 from .media import MediaRejected, normalize
+from .parts import PROPOSAL_MODEL, crop, propose_parts
 from .validation import validate
 
 log = logging.getLogger("bowr_worker")
@@ -38,7 +48,12 @@ class Lease:
         self.job_id: str = job["job_id"]
         self.generation: int = job["lease_generation"]
         self.capability: str = job["capability"]
-        self.output_url: str = job["output"]["url"]
+        # Validation writes one output; an item stage writes several.
+        self.output_urls: dict[str, str] = (
+            {"original": job["output"]["url"]}
+            if "output" in job
+            else {name: out["url"] for name, out in job["outputs"].items()}
+        )
         self.lost = threading.Event()
         self._stop = threading.Event()
         self._lock = threading.Lock()
@@ -57,6 +72,10 @@ class Lease:
     def auth(self) -> dict[str, str]:
         with self._lock:
             return {"Authorization": f"Bearer {self.capability}"}
+
+    def output_url(self, name: str) -> str:
+        with self._lock:
+            return self.output_urls[name]
 
     def _run(self) -> None:
         while not self._stop.wait(self._interval):
@@ -77,7 +96,10 @@ class Lease:
                 return
             with self._lock:
                 self.capability = data["capability"]
-                self.output_url = data["output"]["url"]
+                if "output" in data:
+                    self.output_urls = {"original": data["output"]["url"]}
+                else:
+                    self.output_urls = {name: out["url"] for name, out in data.get("outputs", {}).items()}
 
 
 def _download(client: httpx.Client, url: str, max_bytes: int) -> bytes | None:
@@ -114,6 +136,173 @@ def _report_failure(client: httpx.Client, internal_api: str, lease: Lease, code:
     return f"failed:{code}:{status}"
 
 
+def _validate_upload(job: dict[str, Any], lease: Lease, client: httpx.Client) -> dict[str, Any] | None:
+    spec = job["input"]
+    source = _download(client, job["source"]["url"], spec["max_bytes"] + 1)
+    if source is None:
+        raise MediaRejected("SOURCE_MISSING")
+    image = normalize(
+        source,
+        declared_content_type=spec["declared_content_type"],
+        rotation=spec["rotation"],
+        max_bytes=spec["max_bytes"],
+        max_pixels=spec["max_pixels"],
+        max_edge=spec["max_edge"],
+    )
+    if lease.lost.is_set():
+        return None
+    uploaded = client.put(
+        lease.output_url("original"),
+        content=image.data,
+        headers={"Content-Type": job["output"]["content_type"]},
+        timeout=60,
+    )
+    uploaded.raise_for_status()
+    output: dict[str, Any] = {
+        "width": image.width,
+        "height": image.height,
+        "byte_size": len(image.data),
+        "sha256": image.sha256,
+    }
+    if spec["purpose"] == "grouped":
+        # Suggested rectangles only; nothing becomes a piece until the member confirms.
+        with Image.open(io.BytesIO(image.data), formats=["WEBP"]) as normalized:
+            output["parts"] = propose_parts(normalized.convert("RGB"), PROPOSAL_MODEL)
+    return {
+        "schema_version": 1,
+        "lease_generation": job["lease_generation"],
+        "outcome": "ready",
+        "output": output,
+    }
+
+
+def _cutout_stage(job: dict[str, Any], lease: Lease, client: httpx.Client) -> dict[str, Any] | None:
+    spec = job["input"]
+    source = _download(client, job["sources"]["original"]["url"], spec["max_bytes"])
+    if source is None:
+        raise MediaRejected("SOURCE_MISSING")
+    if spec["model"] == "manual":
+        # The member's edited mask; the cutout is composed from the stored original.
+        mask = _download(client, job["sources"]["mask"]["url"], spec["max_bytes"])
+        if mask is None:
+            raise MediaRejected("SOURCE_MISSING")
+        result = cutout_from_mask(source, mask)
+    else:
+        try:
+            result = cutout(source, spec["model"])
+        except models.ModelUnavailable as missing:
+            raise MediaRejected("MODEL_UNAVAILABLE") from missing
+    if lease.lost.is_set():
+        return None
+    renditions = {"cutout": result.cutout, "thumbnail": result.thumbnail, "mask": result.mask}
+    for name, rendition in renditions.items():
+        uploaded = client.put(
+            lease.output_url(name),
+            content=rendition.data,
+            headers={"Content-Type": job["outputs"][name]["content_type"]},
+            timeout=60,
+        )
+        uploaded.raise_for_status()
+    return {
+        "schema_version": 1,
+        "lease_generation": job["lease_generation"],
+        "outcome": "ready",
+        "outputs": {name: rendition.describe() for name, rendition in renditions.items()},
+        "result": {"foreground_ratio": result.foreground_ratio},
+    }
+
+
+def _colors_stage(job: dict[str, Any], lease: Lease, client: httpx.Client) -> dict[str, Any] | None:
+    source = _download(client, job["sources"]["cutout"]["url"], job["input"]["max_bytes"])
+    if source is None:
+        raise MediaRejected("SOURCE_MISSING")
+    colors = dominant_colors(source, job["input"]["max_colors"])
+    if not colors:
+        raise MediaRejected("NO_FOREGROUND")
+    return {
+        "schema_version": 1,
+        "lease_generation": job["lease_generation"],
+        "outcome": "ready",
+        "result": {"suggested": {"colors": colors}},
+    }
+
+
+def _embedding_stage(job: dict[str, Any], lease: Lease, client: httpx.Client) -> dict[str, Any] | None:
+    spec = job["input"]
+    source = _download(client, job["sources"]["cutout"]["url"], spec["max_bytes"])
+    if source is None:
+        raise MediaRejected("SOURCE_MISSING")
+    try:
+        vector = embed(source, spec["model"], spec["model_revision"], spec["preprocess_version"])
+    except models.ModelUnavailable as missing:
+        raise MediaRejected("MODEL_UNAVAILABLE") from missing
+    return {
+        "schema_version": 1,
+        "lease_generation": job["lease_generation"],
+        "outcome": "ready",
+        "result": {
+            "model": spec["model"],
+            "model_revision": spec["model_revision"],
+            "preprocess_version": spec["preprocess_version"],
+            "vector": vector,
+        },
+    }
+
+
+def _crop_stage(job: dict[str, Any], lease: Lease, client: httpx.Client) -> dict[str, Any] | None:
+    spec = job["input"]
+    source = _download(client, job["sources"]["source"]["url"], spec["max_bytes"])
+    if source is None:
+        raise MediaRejected("SOURCE_MISSING")
+    part = crop(source, spec["box"])
+    if lease.lost.is_set():
+        return None
+    uploaded = client.put(
+        lease.output_url("original"),
+        content=part.data,
+        headers={"Content-Type": job["outputs"]["original"]["content_type"]},
+        timeout=60,
+    )
+    uploaded.raise_for_status()
+    return {
+        "schema_version": 1,
+        "lease_generation": job["lease_generation"],
+        "outcome": "ready",
+        "outputs": {"original": part.describe()},
+    }
+
+
+STAGES = {
+    "crop": _crop_stage,
+    "cutout": _cutout_stage,
+    "colors": _colors_stage,
+    "embedding": _embedding_stage,
+}
+
+
+def _run_ai_stage(job: dict[str, Any], lease: Lease, client: httpx.Client, internal_api: str) -> str:
+    """Asks the internal gateway to run this claimed AI job. The gateway builds the
+    prompt, reserves budget, calls the provider, validates and applies the result;
+    the worker holds only the lease."""
+    body = {"schema_version": 1, "lease_generation": job["lease_generation"]}
+    validate("worker_ai_request", body)
+    try:
+        response = client.post(
+            f"{internal_api}/v1/jobs/{job['job_id']}/ai", json=body, headers=lease.auth(), timeout=90
+        )
+    except httpx.HTTPError:
+        return _report_failure(client, internal_api, lease, "TRANSIENT_STORAGE")
+    finally:
+        lease.stop()
+    if response.status_code != 200:
+        log.info("job %s ai request refused (%s)", job["job_id"], response.status_code)
+        return f"ai:{response.status_code}"
+    data = response.json()["data"]
+    validate("worker_ai_response", data)
+    log.info("job %s ai -> %s", job["job_id"], data["status"])
+    return f"ai:{data['status']}"
+
+
 def run_job(
     wake: dict[str, Any],
     internal_api: str,
@@ -130,45 +319,22 @@ def run_job(
         return "claim_refused"
     job = claimed.json()["data"]
     validate("worker_claim_response", job)
-    spec = job["input"]
+    item_stage = job["kind"] == "item_stage"
+    complete_schema = "item_stage_complete_request" if item_stage else "worker_complete_request"
 
     lease = Lease(job, internal_api, client, heartbeat_seconds)
     lease.start()
-    body: dict[str, Any]
+    if item_stage and job["stage"] in ("tags", "label"):
+        return _run_ai_stage(job, lease, client, internal_api)
+    body: dict[str, Any] | None
     try:
         if before_process:
             before_process()
-        source = _download(client, job["source"]["url"], spec["max_bytes"] + 1)
-        if source is None:
-            raise MediaRejected("SOURCE_MISSING")
-        image = normalize(
-            source,
-            declared_content_type=spec["declared_content_type"],
-            rotation=spec["rotation"],
-            max_bytes=spec["max_bytes"],
-            max_pixels=spec["max_pixels"],
-            max_edge=spec["max_edge"],
+        body = (
+            STAGES[job["stage"]](job, lease, client) if item_stage else _validate_upload(job, lease, client)
         )
-        if lease.lost.is_set():
+        if body is None:
             return "lease_lost"
-        uploaded = client.put(
-            lease.output_url,
-            content=image.data,
-            headers={"Content-Type": job["output"]["content_type"]},
-            timeout=60,
-        )
-        uploaded.raise_for_status()
-        body = {
-            "schema_version": 1,
-            "lease_generation": job["lease_generation"],
-            "outcome": "ready",
-            "output": {
-                "width": image.width,
-                "height": image.height,
-                "byte_size": len(image.data),
-                "sha256": image.sha256,
-            },
-        }
     except MediaRejected as rejected:
         body = {
             "schema_version": 1,
@@ -186,7 +352,7 @@ def run_job(
 
     if lease.lost.is_set():
         return "lease_lost"
-    validate("worker_complete_request", body)
+    validate(complete_schema, body)
     completed = client.post(
         f"{internal_api}/v1/jobs/{job['job_id']}/complete", json=body, headers=lease.auth(), timeout=30
     )

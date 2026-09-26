@@ -1,3 +1,4 @@
+import { categories } from '@bowr/domain';
 import { z } from 'zod';
 
 /**
@@ -18,6 +19,10 @@ export const routeTemplates = [
   '/wardrobe',
   '/wardrobe/gather',
   '/wardrobe/uploads/:id',
+  '/wardrobe/split/:id',
+  '/wardrobe/items/:id',
+  '/wardrobe/edges/:id',
+  '/help/photos',
   '/more',
   '/admin',
   '/settings',
@@ -30,6 +35,9 @@ export type RouteTemplate = (typeof routeTemplates)[number];
 export function routeTemplate(pathname: string): RouteTemplate {
   const path = pathname.split(/[?#]/)[0]!.replace(/\/+$/, '') || '/';
   if (/^\/wardrobe\/uploads\/[^/]+$/.test(path)) return '/wardrobe/uploads/:id';
+  if (/^\/wardrobe\/split\/[^/]+$/.test(path)) return '/wardrobe/split/:id';
+  if (/^\/wardrobe\/items\/[^/]+$/.test(path)) return '/wardrobe/items/:id';
+  if (/^\/wardrobe\/edges\/[^/]+$/.test(path)) return '/wardrobe/edges/:id';
   return (routeTemplates as readonly string[]).includes(path) ? (path as RouteTemplate) : '/other';
 }
 
@@ -49,5 +57,8 @@ export const AnalyticsEvent = z.discriminatedUnion('event', [
     })
     .strict(),
   z.object({ event: z.literal('client_error'), properties: z.object({ code, route }).strict() }).strict(),
+  // PRD: is onboarding happening? Categorical fields only; never names or photos.
+  z.object({ event: z.literal('item_added'), properties: z.object({ source: z.enum(['upload', 'group']) }).strict() }).strict(),
+  z.object({ event: z.literal('item_reviewed'), properties: z.object({ category: z.enum(categories) }).strict() }).strict(),
 ]);
 export type AnalyticsEvent = z.infer<typeof AnalyticsEvent>;

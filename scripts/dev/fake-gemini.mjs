@@ -4,20 +4,46 @@
 //
 //   node scripts/dev/fake-gemini.mjs            (port 8790)
 //   GET  /__calls   -> { count_tokens, generate_content, last_models }
-//   POST /__control -> { mode, delay_ms?, output_tokens? }
+//   POST /__control -> { mode, delay_ms?, output_tokens?, tags?, label? }
 //   POST /__reset
 // Modes: ok | timeout | reject_400 | quota_429 | server_500 | overcharge | invalid_output
+// A request whose text starts the item-tags prompt ("bowr:item_tags") gets the
+// `tags` object (a default shirt unless set); others get {"ok":true}.
 import http from 'node:http';
 
 const PORT = Number(process.env.FAKE_GEMINI_PORT ?? 8790);
-let calls = { count_tokens: 0, generate_content: 0, last_models: [] };
-let control = { mode: 'ok', delay_ms: 0, output_tokens: 5 };
+const DEFAULT_TAGS = {
+  category: 'tops',
+  category_confidence: 'high',
+  subcategory: 'shirt',
+  pattern: 'solid',
+  material: 'cotton',
+  formality: 2,
+  seasons: ['hot', 'mild'],
+  style_tags: ['minimal'],
+};
+const DEFAULT_LABEL = { brand: 'Uniqlo', size_label: 'M', material: '100% cotton' };
+let calls = { count_tokens: 0, generate_content: 0, last_models: [], last_had_image: false };
+let control = { mode: 'ok', delay_ms: 0, output_tokens: 5, tags: DEFAULT_TAGS, label: DEFAULT_LABEL };
 
 const send = (res, status, body) => {
   res.writeHead(status, { 'content-type': 'application/json' });
   res.end(JSON.stringify(body));
 };
-const tokens = (text) => Math.max(1, Math.ceil(text.length / 4));
+// Text counts about four characters per token; each inline image counts 258
+// tokens (the provider's flat small-image rate), not its base64 length.
+function countRequest(raw) {
+  let body;
+  try {
+    body = JSON.parse(raw || '{}');
+  } catch {
+    return { tokens: Math.max(1, Math.ceil(raw.length / 4)), text: raw, image: false };
+  }
+  const parts = (body.contents ?? body.generateContentRequest?.contents ?? []).flatMap((c) => c.parts ?? []);
+  const text = parts.map((p) => p.text ?? '').join('\n');
+  const images = parts.filter((p) => p.inlineData || p.inline_data).length;
+  return { tokens: Math.max(1, Math.ceil(text.length / 4) + images * 258), text, image: images > 0 };
+}
 
 http
   .createServer((req, res) => {
@@ -27,8 +53,8 @@ http
       const path = new URL(req.url, 'http://fake').pathname;
       if (path === '/__calls') return send(res, 200, calls);
       if (path === '/__reset') {
-        calls = { count_tokens: 0, generate_content: 0, last_models: [] };
-        control = { mode: 'ok', delay_ms: 0, output_tokens: 5 };
+        calls = { count_tokens: 0, generate_content: 0, last_models: [], last_had_image: false };
+        control = { mode: 'ok', delay_ms: 0, output_tokens: 5, tags: DEFAULT_TAGS, label: DEFAULT_LABEL };
         return send(res, 200, { ok: true });
       }
       if (path === '/__control') {
@@ -40,7 +66,8 @@ http
       const match = /^\/v1beta\/models\/([^:]+):(countTokens|generateContent)$/.exec(path);
       if (!match) return send(res, 404, { error: { code: 404, message: 'not found', status: 'NOT_FOUND' } });
       const [, model, method] = match;
-      const promptTokens = tokens(raw);
+      const request = countRequest(raw);
+      const promptTokens = request.tokens;
 
       if (method === 'countTokens') {
         calls.count_tokens += 1;
@@ -49,6 +76,7 @@ http
 
       calls.generate_content += 1;
       calls.last_models = [...calls.last_models.slice(-9), model];
+      calls.last_had_image = request.image;
       if (control.delay_ms) await new Promise((resolve) => setTimeout(resolve, control.delay_ms));
       switch (control.mode) {
         case 'timeout':
@@ -61,7 +89,13 @@ http
           return send(res, 500, { error: { code: 500, message: 'internal', status: 'INTERNAL' } });
         default: {
           const outputTokens = control.mode === 'overcharge' ? 1_000_000 : control.output_tokens;
-          const text = control.mode === 'invalid_output' ? 'not json' : '{"ok":true}';
+          const text = control.mode === 'invalid_output'
+            ? 'not json'
+            : request.text.startsWith('bowr:item_tags')
+            ? JSON.stringify(control.tags)
+            : request.text.startsWith('bowr:label_read')
+            ? JSON.stringify(control.label)
+            : '{"ok":true}';
           return send(res, 200, {
             candidates: [{ content: { role: 'model', parts: [{ text }] }, finishReason: 'STOP' }],
             usageMetadata: {

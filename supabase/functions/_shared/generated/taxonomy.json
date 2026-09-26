@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "categories": {
+    "tops": [
+      "t-shirt",
+      "shirt",
+      "polo",
+      "blouse",
+      "sweater",
+      "hoodie",
+      "tank",
+      "other"
+    ],
+    "bottoms": [
+      "jeans",
+      "trousers",
+      "shorts",
+      "skirt",
+      "leggings",
+      "other"
+    ],
+    "outerwear": [
+      "jacket",
+      "coat",
+      "blazer",
+      "cardigan",
+      "vest",
+      "other"
+    ],
+    "dresses": [
+      "dress",
+      "jumpsuit",
+      "other"
+    ],
+    "shoes": [
+      "sneakers",
+      "loafers",
+      "boots",
+      "sandals",
+      "slides",
+      "heels",
+      "other"
+    ],
+    "eyewear": [
+      "shades",
+      "optical frames"
+    ],
+    "headwear": [
+      "cap",
+      "bucket hat",
+      "beanie",
+      "other"
+    ],
+    "bags": [
+      "tote",
+      "backpack",
+      "crossbody",
+      "shoulder bag",
+      "clutch",
+      "other"
+    ],
+    "belts": [
+      "belt"
+    ],
+    "watches": [
+      "watch"
+    ],
+    "jewelry": [
+      "earrings",
+      "necklace",
+      "bracelet",
+      "ring",
+      "other"
+    ]
+  },
+  "patterns": [
+    "solid",
+    "striped",
+    "checked",
+    "floral",
+    "graphic",
+    "printed",
+    "dotted",
+    "textured",
+    "other"
+  ],
+  "seasons": [
+    "hot",
+    "mild",
+    "cold",
+    "rainy"
+  ],
+  "colors": [
+    "black",
+    "charcoal",
+    "grey",
+    "white",
+    "cream",
+    "beige",
+    "khaki",
+    "tan",
+    "brown",
+    "burgundy",
+    "red",
+    "pink",
+    "orange",
+    "mustard",
+    "yellow",
+    "olive",
+    "green",
+    "teal",
+    "light blue",
+    "blue",
+    "navy",
+    "purple",
+    "silver",
+    "gold"
+  ],
+  "attributes": {
+    "sole_color": {
+      "categories": [
+        "shoes"
+      ],
+      "values": [
+        "black",
+        "charcoal",
+        "grey",
+        "white",
+        "cream",
+        "beige",
+        "khaki",
+        "tan",
+        "brown",
+        "burgundy",
+        "red",
+        "pink",
+        "orange",
+        "mustard",
+        "yellow",
+        "olive",
+        "green",
+        "teal",
+        "light blue",
+        "blue",
+        "navy",
+        "purple",
+        "silver",
+        "gold"
+      ]
+    },
+    "frame_shape": {
+      "categories": [
+        "eyewear"
+      ],
+      "values": [
+        "round",
+        "square",
+        "rectangle",
+        "aviator",
+        "cat-eye",
+        "oval",
+        "other"
+      ]
+    },
+    "frame_color": {
+      "categories": [
+        "eyewear"
+      ],
+      "values": [
+        "black",
+        "charcoal",
+        "grey",
+        "white",
+        "cream",
+        "beige",
+        "khaki",
+        "tan",
+        "brown",
+        "burgundy",
+        "red",
+        "pink",
+        "orange",
+        "mustard",
+        "yellow",
+        "olive",
+        "green",
+        "teal",
+        "light blue",
+        "blue",
+        "navy",
+        "purple",
+        "silver",
+        "gold"
+      ]
+    },
+    "lens_tint": {
+      "categories": [
+        "eyewear"
+      ],
+      "values": [
+        "clear",
+        "dark",
+        "gradient",
+        "mirrored",
+        "colored"
+      ]
+    },
+    "has_logo": {
+      "categories": [
+        "headwear"
+      ],
+      "values": [
+        true,
+        false
+      ]
+    }
+  },
+  "max_colors": 5,
+  "max_style_tags": 10
+}

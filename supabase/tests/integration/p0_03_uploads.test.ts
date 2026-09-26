@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { api, maintenance } from '../../../tests/support/api';
 import { createIdentity } from '../../../tests/support/identities';
 import { createSlot, mediaFixtures, member, putSlot, sha256, storageAdmin, type Member } from '../../../tests/support/media';
+import { issueClaimWhenFree, settleItemStages } from '../../../tests/support/jobs';
 import { sql, stack } from '../../../tests/support/stack';
 
 let fixtures: ReturnType<typeof mediaFixtures>;
@@ -290,13 +291,14 @@ describe('P0.03-T3: authenticated, scoped worker API', () => {
     const { entry } = await createSlot(owner.token, fixtures.png, 'image/png');
     harnessEntries.push(entry.entry_id);
     await putSlot(entry, fixtures.png);
+    await settleItemStages();
     const [row] = await sql()`select public.svc_complete_upload_entry(${owner.id}, ${randomUUID()}, ${entry.entry_id}, ${fixtures.png.length}) as r`;
     return { jobId: row!.r.job_id, entryId: entry.entry_id };
   }
 
   async function claim(jobId: string, token?: string) {
     const claimToken = token ?? randomBytes(32).toString('hex');
-    if (!token) await sql()`select public.svc_issue_job_claim(${jobId}, ${sha256(Buffer.from(claimToken))})`;
+    if (!token) await issueClaimWhenFree(jobId, sha256(Buffer.from(claimToken)));
     const response = await fetch(internal('/jobs/claim'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

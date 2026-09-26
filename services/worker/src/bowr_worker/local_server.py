@@ -16,7 +16,6 @@ from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import httpx
-from jsonschema import ValidationError
 
 from .pipeline import run_job
 from .validation import validate
@@ -29,6 +28,9 @@ HEARTBEAT_SECONDS = float(os.environ.get("BOWR_WORKER_HEARTBEAT_SECONDS", "15"))
 # Development only: hold each claimed job before processing, so recovery tests can
 # stop a worker mid-stage. Never set in the Modal deployment.
 STAGE_DELAY_SECONDS = float(os.environ.get("BOWR_WORKER_STAGE_DELAY_SECONDS", "0"))
+
+# The local stack's vector space is the development embedding (supabase/seed.sql).
+os.environ.setdefault("BOWR_DEV_EMBEDDING", "1")
 
 # At most two concurrent processing jobs (ARCHITECTURE section 9.2).
 executor = ThreadPoolExecutor(max_workers=2)
@@ -60,7 +62,7 @@ class WakeHandler(BaseHTTPRequestHandler):
         try:
             wake = json.loads(self.rfile.read(min(length, 4096)))
             validate("worker_wake", wake)
-        except (ValueError, ValidationError):
+        except ValueError:
             self.send_response(422)
             self.end_headers()
             return

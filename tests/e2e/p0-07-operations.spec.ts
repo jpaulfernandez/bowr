@@ -15,6 +15,8 @@ const ALLOWED: Record<string, string[]> = {
   upload_started: ['files'],
   upload_failed: ['code', 'format'],
   client_error: ['code', 'route'],
+  item_added: ['source'],
+  item_reviewed: ['category'],
 };
 
 type Captured = { api_key: string; event: string; distinct_id: string; timestamp: string; properties: Record<string, unknown> };

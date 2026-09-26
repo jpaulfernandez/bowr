@@ -5,6 +5,7 @@ import { useBootstrap } from '../../lib/bootstrap';
 
 const entries: Array<{ href: Href; label: string; description: string }> = [
   { href: '/settings', label: 'Settings', description: 'Account, location and units' },
+  { href: '/help/photos', label: 'Photo guides', description: 'How to photograph each kind of piece' },
   { href: '/privacy', label: 'Privacy', description: 'How bowr handles your data' },
 ];
 

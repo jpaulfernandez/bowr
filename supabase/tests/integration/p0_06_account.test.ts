@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { accessToken, api, maintenance } from '../../../tests/support/api';
 import { createIdentity } from '../../../tests/support/identities';
 import { createSlot, mediaFixtures, putSlot, sha256, storageAdmin } from '../../../tests/support/media';
+import { issueClaimWhenFree, settleItemStages } from '../../../tests/support/jobs';
 import { admin, sql, stack } from '../../../tests/support/stack';
 
 const storage = storageAdmin();
@@ -212,9 +213,10 @@ describe('P0.06-A4: recoverable deletion', () => {
     // A second upload is mid-processing under a harness "worker" when deletion starts.
     const late = await createSlot(token, fixtures.png, 'image/png');
     await putSlot(late.entry, fixtures.png);
+    await settleItemStages();
     const [queued] = await sql()`select public.svc_complete_upload_entry(${member.id}, ${randomUUID()}, ${late.entry.entry_id}, ${fixtures.png.length}) as r`;
     const claimToken = randomBytes(32).toString('hex');
-    await sql()`select public.svc_issue_job_claim(${queued!.r.job_id}, ${sha256(Buffer.from(claimToken))})`;
+    expect(await issueClaimWhenFree(queued!.r.job_id, sha256(Buffer.from(claimToken)))).toBe(true);
     const claimed = await fetch(`${stack().API_URL}/functions/v1/internal/v1/jobs/claim`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -6,6 +6,7 @@ import { accessToken, api, maintenance } from '../../../tests/support/api';
 import { fakeGemini } from '../../../tests/support/fake-gemini';
 import { createIdentity } from '../../../tests/support/identities';
 import { createSlot, mediaFixtures, putSlot } from '../../../tests/support/media';
+import { settleItemStages } from '../../../tests/support/jobs';
 import { connection, sql } from '../../../tests/support/stack';
 
 let ownerToken: string;
@@ -39,6 +40,9 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  // Tag stages queued by earlier uploads call the gateway in the background;
+  // let them finish so this file's provider-call counts are its own.
+  await settleItemStages();
   await fakeGemini.reset();
   await sql()`update private.budget_settings set lighter_micros = 8000000, stop_micros = 9500000, ceiling_micros = 10000000, paused_reason = null`;
 });
@@ -85,6 +89,11 @@ describe('P0.05 demo and A1: zero allowance never reaches the provider', () => {
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
     expect(state).toBe('ready');
+    // The piece's tag stage parks for the budget instead of calling the provider.
+    await settleItemStages();
+    const [tags] = await sql()`select s.state, s.failure_code from public.item_stages s join public.items i on i.id = s.item_id
+      where i.source_entry_id = ${entry.entry_id} and s.stage = 'tags'`;
+    expect(tags).toEqual({ state: 'blocked_budget', failure_code: 'AI_BUDGET_PAUSED' });
     expect((await fakeGemini.calls()).generate_content).toBe(0);
   });
 
