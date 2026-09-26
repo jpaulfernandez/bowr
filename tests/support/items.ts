@@ -1,7 +1,8 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { expect } from 'vitest';
 import { api } from './api';
+import { settleItemStages } from './jobs';
 import { createSlot, putSlot } from './media';
 import { sql, stack } from './stack';
 
@@ -53,4 +54,38 @@ export function userClient(token: string) {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
+}
+
+const internalUrl = (path: string) => `${stack().API_URL}/functions/v1/internal/v1${path}`;
+
+/** POSTs to the internal worker API with a job capability. */
+export async function internalPost(path: string, capability: string, body: unknown) {
+  const response = await fetch(internalUrl(path), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${capability}` },
+    body: JSON.stringify(body),
+  });
+  return { status: response.status, body: (await response.json().catch(() => null)) as any };
+}
+
+/**
+ * The harness re-runs an item's finished stage as a slow, older worker would:
+ * the job is queued again and claimed by the test, not by the local worker.
+ */
+export async function harnessRerun(itemId: string, stage: string, { settle = true } = {}) {
+  if (settle) await settleItemStages();
+  const [{ job_id: jobId }] = await sql()`select job_id from public.item_stages where item_id = ${itemId} and stage = ${stage}`;
+  // Requeued together with the harness's own claim, so the scheduler (or a
+  // dispatch triggered by another completion) never hands it to the local worker.
+  const token = randomBytes(32).toString('hex');
+  await sql()`update private.jobs set state = 'queued', attempt_count = 0, next_run_at = now(),
+      claim_nonce_hash = ${createHash('sha256').update(token).digest('hex')}, claim_expires_at = now() + interval '5 minutes'
+    where id = ${jobId}`;
+  const claimed = await fetch(internalUrl('/jobs/claim'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ job_id: jobId, claim_token: token }),
+  });
+  expect(claimed.status).toBe(200);
+  return { jobId: jobId as string, job: ((await claimed.json()) as any).data };
 }

@@ -14,9 +14,13 @@ export function idempotencyKey(req: Request): string {
 const MAX_BODY_BYTES = 8 * 1024;
 
 /** Reads a small JSON object body and rejects fields outside the allowlist. */
-export async function jsonBody(req: Request, allowed: string[]): Promise<Record<string, unknown>> {
+export async function jsonBody(
+  req: Request,
+  allowed: string[],
+  maxBytes = MAX_BODY_BYTES,
+): Promise<Record<string, unknown>> {
   const text = await req.text();
-  if (text.length > MAX_BODY_BYTES) throw appError(413, 'VALIDATION_FAILED', { reason: 'body_too_large' });
+  if (text.length > maxBytes) throw appError(413, 'VALIDATION_FAILED', { reason: 'body_too_large' });
   let parsed: unknown;
   try {
     parsed = text ? JSON.parse(text) : {};

@@ -93,3 +93,14 @@ def garment_truth(width: int = 800, height: int = 600) -> list[list[bool]]:
 
     pixels = np.asarray(garment(width, height)).astype(int)
     return (pixels[:, :, 0] < 100) & (pixels[:, :, 2] > 60)
+
+
+def trousers(width: int = 800, height: int = 600) -> Image.Image:
+    """Brown trousers on a plain light background: a second, distinguishable piece."""
+    from PIL import ImageDraw
+
+    image = Image.new("RGB", (width, height), (232, 229, 222))
+    sx, sy = width / 800, height / 600
+    points = [(320, 80), (480, 80), (500, 540), (420, 540), (400, 250), (380, 540), (300, 540)]
+    ImageDraw.Draw(image).polygon([(x * sx, y * sy) for x, y in points], fill=(110, 75, 50))
+    return image

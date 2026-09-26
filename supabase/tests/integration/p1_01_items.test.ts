@@ -1,18 +1,19 @@
 // P1.01 integration: one upload becomes exactly one piece with its renditions;
 // manual correction works without AI; foreign identities cannot reach it.
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { taxonomyDocument } from '../../../packages/domain/src/taxonomy';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { api } from '../../../tests/support/api';
 import { createIdentity } from '../../../tests/support/identities';
 import {
   currentAssets,
   gatherPiece,
+  harnessRerun,
   settledStage,
   userClient,
   wardrobeFixtures,
 } from '../../../tests/support/items';
-import { issueClaimWhenFree } from '../../../tests/support/jobs';
+import { settleItemStages } from '../../../tests/support/jobs';
 import { member, sha256, storageAdmin, type Member } from '../../../tests/support/media';
 import { connection, sql, stack } from '../../../tests/support/stack';
 
@@ -31,15 +32,28 @@ async function updateItem(token: string, itemId: string, revision: number, patch
   });
 }
 
+/** The item's revision once background stages (computed colors) have finished. */
+async function settledRevision(itemId: string): Promise<number> {
+  await settleItemStages();
+  const [{ revision }] = await sql()`select revision from public.items where id = ${itemId}`;
+  return Number(revision);
+}
+
 async function access(token: string, assetId: string, variant: string) {
   const response = await api('/media/access', { token, method: 'POST', body: { requests: [{ asset_id: assetId, variant }] } });
   return response.body.data[0];
 }
 
+// P1.01 is the manual path: AI stays paused for this file (tag stages park).
 beforeAll(async () => {
+  await sql()`update private.budget_settings set paused_reason = 'operator' where id`;
   fixtures = wardrobeFixtures();
   a = await member(createIdentity, 'pieces-a');
   b = await member(createIdentity, 'pieces-b');
+});
+
+afterAll(async () => {
+  await sql()`update private.budget_settings set paused_reason = null where id`;
 });
 
 describe('taxonomy', () => {
@@ -74,7 +88,9 @@ describe('P1.01-A1: upload → cutout → edit → reload yields one persistent 
     expect((await access(a.token, byRole.cutout!.asset_id, 'original')).status).toBe('not_found');
     expect((await access(a.token, piece.assetId, 'quarantine')).status).toBe('not_found');
 
-    // Optional details stay optional; the category waits for the member.
+    // Optional details stay optional; the category waits for the member (AI is
+    // paused, so only computed colors may have been filled in).
+    await settleItemStages();
     const { data: rows } = await userClient(a.token).from('items').select('*').eq('id', piece.itemId);
     expect(rows).toHaveLength(1);
     expect(rows![0]).toMatchObject({
@@ -84,17 +100,17 @@ describe('P1.01-A1: upload → cutout → edit → reload yields one persistent 
       brand: null,
       price_minor: null,
       purchased_on: null,
-      revision: 1,
       media_revision: 1,
     });
+    const revision = rows![0].revision as number;
 
     // Manual correction, then a fresh read shows the persisted values.
-    const edited = await updateItem(a.token, piece.itemId, 1, { category: 'tops', subcategory: 'shirt', name: 'Navy Oxford' });
+    const edited = await updateItem(a.token, piece.itemId, revision, { category: 'tops', subcategory: 'shirt', name: 'Navy Oxford' });
     expect(edited.error).toBeNull();
-    expect(edited.data).toMatchObject({ category: 'tops', name: 'Navy Oxford', category_review_required: false, revision: 2 });
+    expect(edited.data).toMatchObject({ category: 'tops', name: 'Navy Oxford', category_review_required: false, revision: revision + 1 });
     expect(edited.data.field_meta.category).toMatchObject({ v: 1, source: 'user', locked: true });
     const { data: reread } = await userClient(a.token).from('items').select('name, category, subcategory, revision').eq('id', piece.itemId).single();
-    expect(reread).toEqual({ name: 'Navy Oxford', category: 'tops', subcategory: 'shirt', revision: 2 });
+    expect(reread).toEqual({ name: 'Navy Oxford', category: 'tops', subcategory: 'shirt', revision: revision + 1 });
   });
 
   it('repeated completion and repeated item creation cannot create another piece', async () => {
@@ -105,20 +121,23 @@ describe('P1.01-A1: upload → cutout → edit → reload yields one persistent 
       expect(again.status).toBe(202);
     }
     await sql()`select private.create_gather_item(e) from public.upload_entries e where e.id = ${piece.entryId}`;
-    const [{ n, jobs }] = await sql()`select count(*)::int as n,
-        (select count(*)::int from private.jobs j where j.target_id = ${piece.itemId}) as jobs
+    const [{ n, jobs, stages }] = await sql()`select count(*)::int as n,
+        (select count(*)::int from private.jobs j where j.target_id = ${piece.itemId}) as jobs,
+        (select count(distinct j.stage)::int from private.jobs j where j.target_id = ${piece.itemId}) as stages
       from public.items where source_entry_id = ${piece.entryId}`;
     expect(n).toBe(1);
-    expect(jobs).toBe(1);
+    // One job per stage, however often completion or item creation repeats.
+    expect(jobs).toBe(stages);
   });
 
   it('an edit request replayed with the same key returns the same result; a changed body conflicts', async () => {
     const piece = await gatherPiece(a.token, fixtures.garment);
+    const r = await settledRevision(piece.itemId);
     const key = randomUUID();
-    const first = await updateItem(a.token, piece.itemId, 1, { category: 'bottoms' }, key);
-    const replay = await updateItem(a.token, piece.itemId, 1, { category: 'bottoms' }, key);
+    const first = await updateItem(a.token, piece.itemId, r, { category: 'bottoms' }, key);
+    const replay = await updateItem(a.token, piece.itemId, r, { category: 'bottoms' }, key);
     expect(replay.data).toEqual(first.data);
-    const changed = await updateItem(a.token, piece.itemId, 1, { category: 'shoes' }, key);
+    const changed = await updateItem(a.token, piece.itemId, r, { category: 'shoes' }, key);
     expect(changed.error?.message).toBe('IDEMPOTENCY_CONFLICT');
   });
 });
@@ -132,7 +151,7 @@ describe('P1.01-A2: failure keeps a viewable original and manual correction', ()
     expect((await access(a.token, piece.assetId, 'original')).status).toBe('ok');
 
     // Manual identification needs no AI and no cutout.
-    const edited = await updateItem(a.token, piece.itemId, 1, { category: 'bags', display_image: 'original' });
+    const edited = await updateItem(a.token, piece.itemId, await settledRevision(piece.itemId), { category: 'bags', display_image: 'original' });
     expect(edited.error).toBeNull();
     expect(edited.data).toMatchObject({ category: 'bags', display_image: 'original', category_review_required: false });
 
@@ -159,18 +178,8 @@ describe('P1.01-A2: failure keeps a viewable original and manual correction', ()
   it('a result for an older media revision is fenced and its renditions are discarded', async () => {
     const piece = await gatherPiece(a.token, fixtures.garment);
     await settledStage(piece.itemId, 'cutout');
-    const [{ job_id: jobId }] = await sql()`select job_id from public.item_stages where item_id = ${piece.itemId}`;
     // The harness re-runs the finished job as an old worker would.
-    await sql()`update private.jobs set state = 'queued', attempt_count = 0 where id = ${jobId}`;
-    const token = randomBytes(32).toString('hex');
-    expect(await issueClaimWhenFree(jobId, sha256(Buffer.from(token)))).toBe(true);
-    const claimed = await fetch(internal('/jobs/claim'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ job_id: jobId, claim_token: token }),
-    });
-    expect(claimed.status).toBe(200);
-    const job = ((await claimed.json()) as any).data;
+    const { jobId, job } = await harnessRerun(piece.itemId, 'cutout');
     expect(job).toMatchObject({ kind: 'item_stage', stage: 'cutout', lease_generation: 2 });
     const before = await currentAssets(piece.itemId);
     // The photo is replaced (media revision advances) while the old attempt runs.
@@ -192,22 +201,14 @@ describe('P1.01-A2: failure keeps a viewable original and manual correction', ()
     expect(await currentAssets(piece.itemId)).toEqual(before);
     const discarded = await sql()`select object_key from private.deletion_tasks where reason = 'stale_output' and object_key like ${`users/${a.id}/items/${piece.itemId}/%-g2.%`}`;
     expect(discarded).toHaveLength(3);
-    const [stage] = await sql()`select state, failure_code from public.item_stages where item_id = ${piece.itemId}`;
+    const [stage] = await sql()`select state, failure_code from public.item_stages where item_id = ${piece.itemId} and stage = 'cutout'`;
     expect(stage).toEqual({ state: 'canceled', failure_code: 'SUPERSEDED' });
   });
 
   it('forged renditions are refused: wrong dimensions or bytes never publish', async () => {
     const piece = await gatherPiece(a.token, fixtures.garment);
     await settledStage(piece.itemId, 'cutout');
-    const [{ job_id: jobId }] = await sql()`select job_id from public.item_stages where item_id = ${piece.itemId}`;
-    await sql()`update private.jobs set state = 'queued', attempt_count = 0 where id = ${jobId}`;
-    const token = randomBytes(32).toString('hex');
-    expect(await issueClaimWhenFree(jobId, sha256(Buffer.from(token)))).toBe(true);
-    const job = ((await (await fetch(internal('/jobs/claim'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ job_id: jobId, claim_token: token }),
-    })).json()) as any).data;
+    const { jobId, job } = await harnessRerun(piece.itemId, 'cutout');
     const before = await currentAssets(piece.itemId);
     // The original's bytes are uploaded as if they were a 1024 px cutout.
     const original = before.find((row) => row.role === 'original')!;
@@ -260,6 +261,7 @@ describe('P1.01-A3: ownership and revisions', () => {
 
   it('simultaneous edits at the same revision: one applies, the other gets a conflict', async () => {
     const piece = await gatherPiece(a.token, fixtures.garment);
+    const r = await settledRevision(piece.itemId);
     // Hold the row so both requests are in flight together, then release.
     const holder = connection();
     let release!: () => void;
@@ -270,8 +272,8 @@ describe('P1.01-A3: ownership and revisions', () => {
     });
     await new Promise((resolve) => setTimeout(resolve, 200));
     const racing = Promise.all([
-      updateItem(a.token, piece.itemId, 1, { material: 'linen' }),
-      updateItem(a.token, piece.itemId, 1, { material: 'cotton' }),
+      updateItem(a.token, piece.itemId, r, { material: 'linen' }),
+      updateItem(a.token, piece.itemId, r, { material: 'cotton' }),
     ]);
     await new Promise((resolve) => setTimeout(resolve, 500));
     release();
@@ -281,13 +283,14 @@ describe('P1.01-A3: ownership and revisions', () => {
     const codes = results.map((r) => r.error?.message ?? 'ok').sort();
     expect(codes).toEqual(['REVISION_CONFLICT', 'ok']);
     const conflict = results.find((r) => r.error)!;
-    expect(JSON.parse(conflict.error!.details!)).toEqual({ current_revision: 2 });
+    expect(JSON.parse(conflict.error!.details!)).toEqual({ current_revision: r + 1 });
     const [{ revision }] = await sql()`select revision from public.items where id = ${piece.itemId}`;
-    expect(Number(revision)).toBe(2);
+    expect(Number(revision)).toBe(r + 1);
   });
 
   it('taxonomy and field rules are enforced by the database', async () => {
     const piece = await gatherPiece(a.token, fixtures.garment);
+    const r = await settledRevision(piece.itemId);
     const invalid: Array<Record<string, unknown>> = [
       { category: 'accessories' },
       { category: 'tops', subcategory: 'loafers' },
@@ -303,11 +306,11 @@ describe('P1.01-A3: ownership and revisions', () => {
       { lifecycle: 'archived' },
     ];
     for (const patch of invalid) {
-      const result = await updateItem(a.token, piece.itemId, 1, patch);
+      const result = await updateItem(a.token, piece.itemId, r, patch);
       expect(result.error?.message, JSON.stringify(patch)).toBe('VALIDATION_FAILED');
     }
     // Accessory attributes apply to their categories; changing category prunes them.
-    const eyewear = await updateItem(a.token, piece.itemId, 1, {
+    const eyewear = await updateItem(a.token, piece.itemId, r, {
       category: 'eyewear',
       subcategory: 'shades',
       attributes: { frame_shape: 'round', lens_tint: 'dark' },
@@ -316,11 +319,12 @@ describe('P1.01-A3: ownership and revisions', () => {
       currency: 'PHP',
     });
     expect(eyewear.error).toBeNull();
-    const moved = await updateItem(a.token, piece.itemId, 2, { category: 'bags' });
+    const moved = await updateItem(a.token, piece.itemId, r + 1, { category: 'bags' });
     expect(moved.data).toMatchObject({ category: 'bags', subcategory: null, attributes: {} });
     // Clearing a value is a locked edit too.
-    const cleared = await updateItem(a.token, piece.itemId, 3, { colors: [] });
-    expect(cleared.data.field_meta.colors).toMatchObject({ v: 2, source: 'user', locked: true });
+    const cleared = await updateItem(a.token, piece.itemId, r + 2, { colors: [] });
+    expect(cleared.data.colors).toEqual([]);
+    expect(cleared.data.field_meta.colors).toMatchObject({ source: 'user', locked: true });
   });
 });
 

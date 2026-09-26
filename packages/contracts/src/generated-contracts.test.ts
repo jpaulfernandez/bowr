@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { parse } from 'yaml';
-import { taxonomyDocument } from '@bowr/domain';
+import { namedColors, taxonomyDocument } from '@bowr/domain';
 import { ModelManifest } from './model-manifest';
 import { workerJsonSchemas } from './worker';
 
@@ -55,5 +55,13 @@ describe('generated taxonomy', () => {
     const generated = `${JSON.stringify(taxonomyDocument(), null, 2)}\n`;
     if (process.env.UPDATE_CONTRACTS === '1') writeFileSync(taxonomyPath, generated);
     expect(readFileSync(taxonomyPath, 'utf8')).toBe(generated);
+  });
+});
+
+describe('generated color palette', () => {
+  it('palette.json (named colors with hex) matches packages/domain', () => {
+    const generated = `${JSON.stringify(namedColors, null, 2)}\n`;
+    if (process.env.UPDATE_CONTRACTS === '1') writeFileSync(`${outDir}palette.json`, generated);
+    expect(readFileSync(`${outDir}palette.json`, 'utf8')).toBe(generated);
   });
 });

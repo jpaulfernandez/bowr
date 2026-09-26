@@ -30,6 +30,9 @@ HEARTBEAT_SECONDS = float(os.environ.get("BOWR_WORKER_HEARTBEAT_SECONDS", "15"))
 # stop a worker mid-stage. Never set in the Modal deployment.
 STAGE_DELAY_SECONDS = float(os.environ.get("BOWR_WORKER_STAGE_DELAY_SECONDS", "0"))
 
+# The local stack's vector space is the development embedding (supabase/seed.sql).
+os.environ.setdefault("BOWR_DEV_EMBEDDING", "1")
+
 # At most two concurrent processing jobs (ARCHITECTURE section 9.2).
 executor = ThreadPoolExecutor(max_workers=2)
 client = httpx.Client()

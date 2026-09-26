@@ -56,9 +56,19 @@ async function dispatchJobs() {
 }
 
 async function aiRollover() {
-  const { data, error } = await serviceClient().rpc('svc_ai_rollover', {});
+  const db = serviceClient();
+  const { data, error } = await db.rpc('svc_ai_rollover', {});
   if (error) throw new Error(`rollover failed: ${error.code}`);
-  return { holds_created: (data as { holds_created: number }).holds_created, ...(await observeBudgetMode()) };
+  // After a reset, parked tag stages for pieces that still exist become runnable
+  // again; each still needs a new reservation. Opening a screen never does this.
+  const { data: resumed, error: resumeError } = await db.rpc('svc_resume_blocked_stages', { p_limit: 50 });
+  if (resumeError) throw new Error(`resume failed: ${resumeError.code}`);
+  if ((resumed as number) > 0) await dispatchRunnable(20);
+  return {
+    holds_created: (data as { holds_created: number }).holds_created,
+    stages_resumed: resumed as number,
+    ...(await observeBudgetMode()),
+  };
 }
 
 /** Operator-only guarded smoke call through the same gateway and budget. */

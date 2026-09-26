@@ -198,7 +198,7 @@ route('GET', /^\/v1\/upload-entries\/([^/]+)\/status$/, async ({ req, requestId,
 
 // --- Items -------------------------------------------------------------------
 
-const ITEM_STAGES = ['cutout'];
+const ITEM_STAGES = ['cutout', 'colors', 'embedding', 'tags'];
 
 // Owner retries a failed or interrupted stage for the item's current media revision.
 route('POST', /^\/v1\/items\/([^/]+)\/process$/, async ({ req, requestId, params }) => {

@@ -9,6 +9,7 @@ import { Screen } from '../../../../components/Screen';
 import { Heading, Text } from '../../../../components/Text';
 import { PieceEditor } from '../../../../features/items/PieceEditor';
 import { PieceImage } from '../../../../features/items/PieceImage';
+import { ProcessingPanel } from '../../../../features/items/ProcessingPanel';
 import { assetFor, stageFor, useItem, useRetryStage, useUpdateItem } from '../../../../features/items/queries';
 import { ApiError } from '../../../../lib/errors';
 
@@ -115,6 +116,7 @@ export default function PieceDetail() {
             <Banner tone="warning" message="Check category: choose one so this piece can be suggested in outfits. You can still find and use it." />
           ) : null}
           {notice ? <Banner tone="error" message={notice} /> : null}
+          <ProcessingPanel item={piece} />
           <Heading level={2}>Details</Heading>
           <PieceEditor key={piece.id} item={piece} />
         </View>

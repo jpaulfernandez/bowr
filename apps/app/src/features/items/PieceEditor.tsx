@@ -140,9 +140,17 @@ function Suggested({ item, field }: { item: Item; field: string }) {
   return <Text variant="secondary">{meta.source === 'label' ? 'Read from the care label' : 'Suggested'}</Text>;
 }
 
+/** Draft fields the member changed relative to the snapshot the draft started from. */
+function dirtyKeys(base: Item, draft: Draft): Array<keyof Draft> {
+  const start = toDraft(base);
+  return (Object.keys(draft) as Array<keyof Draft>).filter((key) => !same(draft[key], start[key]));
+}
+
 export function PieceEditor({ item }: { item: Item }) {
   const [draft, setDraft] = useState<Draft>(() => toDraft(item));
-  const [baseRevision, setBaseRevision] = useState(item.revision);
+  // The server snapshot the draft is based on. Edits are sent relative to it, so
+  // a suggestion that arrives meanwhile is neither lost nor overwritten.
+  const [base, setBase] = useState<Item>(item);
   const [details, setDetails] = useState(false);
   const [purchase, setPurchase] = useState(false);
   const [problems, setProblems] = useState<Problems>({});
@@ -150,13 +158,14 @@ export function PieceEditor({ item }: { item: Item }) {
   const request = useRef<{ key: string; body: string } | null>(null);
   const update = useUpdateItem(item);
 
-  // A newer revision from elsewhere refreshes the form only when nothing is being edited.
-  if (item.revision !== baseRevision && !update.isPending) {
-    const dirty = Object.keys(toPatch({ ...item, revision: baseRevision }, draft).patch).length > 0;
-    if (!dirty || notice?.tone === 'success') {
-      setDraft(toDraft(item));
-      setBaseRevision(item.revision);
-    }
+  // A newer revision (a suggestion, or an edit elsewhere) rebases the draft: the
+  // member's own changes stay, everything else shows the latest values.
+  if (item.revision !== base.revision && !update.isPending) {
+    const keep = dirtyKeys(base, draft);
+    const next = toDraft(item);
+    for (const key of keep) (next as Record<string, unknown>)[key] = draft[key];
+    setDraft(next);
+    setBase(item);
   }
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((current) => ({ ...current, [key]: value }));
@@ -169,7 +178,7 @@ export function PieceEditor({ item }: { item: Item }) {
 
   const save = () => {
     setNotice(null);
-    const { patch, problems: found } = toPatch(item, draft);
+    const { patch, problems: found } = toPatch(base, draft);
     setProblems(found);
     if (Object.keys(found).length > 0) return;
     if (Object.keys(patch).length === 0) {
@@ -188,7 +197,10 @@ export function PieceEditor({ item }: { item: Item }) {
         onError: (error) => {
           if (error instanceof ApiError && error.code === 'REVISION_CONFLICT') {
             request.current = null;
-            setNotice({ tone: 'error', message: 'This piece changed somewhere else. Reload it, then make your edit again.' });
+            setNotice({
+              tone: 'error',
+              message: 'This piece changed while you were editing. Your changes are kept on the latest version; check them and save again.',
+            });
           } else if (error instanceof ApiError && !error.retryable) {
             request.current = null;
             setNotice({ tone: 'error', message: 'Some values could not be saved. Check them and try again.' });
@@ -198,12 +210,6 @@ export function PieceEditor({ item }: { item: Item }) {
         },
       },
     );
-  };
-
-  const reload = () => {
-    setDraft(toDraft(item));
-    setBaseRevision(item.revision);
-    setNotice(null);
   };
 
   return (
@@ -335,13 +341,7 @@ export function PieceEditor({ item }: { item: Item }) {
         ) : null}
       </View>
 
-      {notice ? (
-        <Banner tone={notice.tone} message={notice.message}>
-          {notice.tone === 'error' && notice.message.startsWith('This piece changed') ? (
-            <Button label="Reload piece" variant="secondary" className="self-start" onPress={reload} />
-          ) : null}
-        </Banner>
-      ) : null}
+      {notice ? <Banner tone={notice.tone} message={notice.message} /> : null}
       <View className="flex-row flex-wrap gap-3">
         <Button label="Save changes" busy={update.isPending} busyLabel="Saving" onPress={save} />
       </View>

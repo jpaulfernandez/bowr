@@ -23,7 +23,8 @@ type RunOptions = {
   attemptKey: string;
   userId: string | null;
   jobId: string | null;
-  prompt: string;
+  /** Text, or text plus inline image parts assembled server-side. */
+  contents: string | Array<{ text: string } | { inlineData: { mimeType: string; data: string } }>;
   responseSchema: Record<string, unknown>;
   validate: (value: unknown) => boolean;
 };
@@ -60,7 +61,7 @@ export async function runAiTask(options: RunOptions): Promise<AiOutcome> {
     return { status: 'unavailable', reason: 'price_or_bound_unknown' };
   }
 
-  const contents = options.prompt;
+  const contents = options.contents;
   // Reserve first, for the configured maximum input: a refused request never
   // contacts the provider, not even for a free token count.
   const reservation = await rpc<{
@@ -193,7 +194,7 @@ export function runDiagnostic(attemptKey: string, userId: string | null) {
     attemptKey,
     userId,
     jobId: null,
-    prompt: 'Return the JSON object {"ok": true}. This is a budget-guard diagnostic with no user content.',
+    contents: 'Return the JSON object {"ok": true}. This is a budget-guard diagnostic with no user content.',
     responseSchema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] },
     validate: (value) => typeof value === 'object' && value !== null && (value as { ok?: unknown }).ok === true,
   });

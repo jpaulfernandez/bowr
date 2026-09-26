@@ -2,8 +2,10 @@
 // Accepts only single-use claim tokens and job-scoped capabilities, never user JWTs.
 import { type JobCapability, sha256Hex, signCapability, verifyCapability } from '../_shared/capability.ts';
 import { afterResponse, dispatchRunnable } from '../_shared/dispatch.ts';
+import { runAiTask } from '../_shared/ai-gateway.ts';
 import { appError, errorResponse, fromDatabaseError, json } from '../_shared/http.ts';
 import { imageInfo } from '../_shared/image-bytes.ts';
+import { TAGS_TASK, tagsPrompt, tagsResponseSchema, validateTags } from '../_shared/item-tags.ts';
 import { serviceClient } from '../_shared/service.ts';
 import { deleteObject, getObject, presignGet, presignPut } from '../_shared/storage.ts';
 import { isUuid, jsonBody } from '../_shared/validate.ts';
@@ -28,7 +30,14 @@ const STAGE_OUTPUTS: Record<string, Record<string, { contentType: 'image/webp' |
     thumbnail: { contentType: 'image/webp', edge: 256 },
     mask: { contentType: 'image/png' },
   },
+  colors: {},
+  embedding: {},
+  // Tags have no worker outputs and are completed only by the gateway (runAi).
+  tags: {},
 };
+const EMBEDDING_DIMENSION = 512;
+// A completion carrying a 512-value vector exceeds the default body limit.
+const MAX_COMPLETE_BODY_BYTES = 32 * 1024;
 
 async function rpc(name: string, args: Record<string, unknown>): Promise<unknown> {
   const { data, error } = await serviceClient().rpc(name, args);
@@ -51,7 +60,7 @@ type ValidationClaimed = {
 type StageClaimed = {
   job_id: string;
   kind: 'item_stage';
-  stage: 'cutout';
+  stage: 'cutout' | 'colors' | 'embedding' | 'tags';
   user_id: string;
   item_id: string;
   lease_generation: number;
@@ -82,7 +91,9 @@ async function claim(req: Request, requestId: string): Promise<Response> {
   const job = (await rpc('svc_claim_job', {
     p_job_id: body.job_id,
     p_nonce_hash: await sha256Hex(body.claim_token),
-  })) as ValidationClaimed | StageClaimed;
+  })) as ValidationClaimed | StageClaimed | { claim_rejected: true };
+  // A superseded item stage is canceled (committed) and refused.
+  if ('claim_rejected' in job) throw appError(403, 'CLAIM_REJECTED');
   const seconds = (Date.parse(job.lease_expires_at) - Date.now()) / 1000;
   const exp = Math.floor(Date.parse(job.lease_expires_at) / 1000);
 
@@ -254,10 +265,25 @@ async function completeValidation(req: Request, requestId: string, jobId: string
   return json(req, requestId, 200, result);
 }
 
+/** A vector must be exactly the space's dimension, finite and unit length. */
+function validVector(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length !== EMBEDDING_DIMENSION) return false;
+  if (value.some((v) => typeof v !== 'number' || !Number.isFinite(v))) return false;
+  const norm = Math.sqrt(value.reduce((sum: number, v: number) => sum + v * v, 0));
+  return Math.abs(norm - 1) < 1e-3;
+}
+
 async function completeStage(req: Request, requestId: string, jobId: string, body: Record<string, unknown>) {
   const capability = await jobCapability(req, jobId, body);
   const expected = STAGE_OUTPUTS[capability.stage];
-  if (!expected) throw appError(403, 'CAPABILITY_REJECTED');
+  // A worker cannot submit model output: the tags stage completes only in runAi.
+  if (!expected || capability.stage === 'tags') throw appError(403, 'CAPABILITY_REJECTED');
+  if (
+    body.outcome === 'ready' && capability.stage === 'embedding' &&
+    !validVector((body.result as Record<string, unknown> | undefined)?.vector)
+  ) {
+    throw appError(422, 'OUTPUT_REJECTED', { field: 'vector' });
+  }
 
   let outputs: Record<string, Record<string, unknown>> | null = null;
   if (body.outcome === 'ready') {
@@ -316,11 +342,95 @@ async function complete(req: Request, requestId: string, jobId: string): Promise
     'outputs',
     'result',
     'failure_code',
-  ]);
+  ], MAX_COMPLETE_BODY_BYTES);
   const capability = await jobCapability(req, jobId, body);
   return capability.stage === 'validate_upload'
     ? await completeValidation(req, requestId, jobId, body)
     : await completeStage(req, requestId, jobId, body);
+}
+
+function base64(bytes: Uint8Array): string {
+  let text = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(text);
+}
+
+/** Budget refusals park the stage until the reset; they are not failures. */
+const BUDGET_REFUSALS = new Set(['budget_stop', 'paused', 'rollover_window']);
+
+/**
+ * Runs a claimed tags job through the budget gateway. The worker only names
+ * the job; the prompt, the photo sent to the provider and the validation are
+ * all server-side, and the result applies only to untouched, unlocked fields
+ * of the same media revision.
+ */
+async function runAi(req: Request, requestId: string, jobId: string): Promise<Response> {
+  const body = await jsonBody(req, ['schema_version', 'lease_generation']);
+  const capability = await jobCapability(req, jobId, body);
+  if (capability.stage !== 'tags') throw appError(403, 'CAPABILITY_REJECTED');
+  const generation = capability.lease_generation;
+  const context = (await rpc('svc_item_ai_context', { p_job_id: jobId, p_lease_generation: generation })) as {
+    status: 'ok' | 'stale';
+    user_id: string;
+    original_key: string | null;
+    attempt_key: string;
+  };
+  if (context.status !== 'ok') return json(req, requestId, 200, { status: 'stale' });
+
+  const finish = async (
+    outcome: 'ready' | 'rejected',
+    result: unknown,
+    failure: string | null,
+  ) => ((await rpc('svc_complete_item_stage', {
+    p_job_id: jobId,
+    p_lease_generation: generation,
+    p_outcome: outcome,
+    p_outputs: null,
+    p_result: result,
+    p_failure_code: failure,
+  })) as { status: 'applied' | 'already_applied' | 'stale'; state?: string });
+
+  let status: 'applied' | 'already_applied' | 'stale' | 'blocked' | 'failed';
+  const photo = context.original_key ? await getObject(context.original_key, MAX_OUTPUT_BYTES) : null;
+  if (!photo) {
+    await finish('rejected', null, 'SOURCE_MISSING');
+    status = 'failed';
+  } else {
+    const outcome = await runAiTask({
+      task: TAGS_TASK,
+      attemptKey: context.attempt_key,
+      userId: context.user_id,
+      jobId,
+      contents: [{ text: tagsPrompt() }, { inlineData: { mimeType: 'image/webp', data: base64(photo) } }],
+      responseSchema: tagsResponseSchema(),
+      validate: (value) => validateTags(value) !== null,
+    });
+    if (outcome.status === 'completed') {
+      const applied = await finish('ready', { suggested: validateTags(outcome.output) }, null);
+      status = applied.status;
+    } else if (outcome.status === 'refused' && BUDGET_REFUSALS.has(outcome.reason)) {
+      const blocked = (await rpc('svc_block_item_stage', { p_job_id: jobId, p_lease_generation: generation })) as {
+        status: string;
+      };
+      status = blocked.status === 'applied' ? 'blocked' : 'stale';
+    } else {
+      // An earlier attempt with this identity may have been billed: never resend it.
+      const code = outcome.status === 'invalid_output'
+        ? 'AI_INVALID_OUTPUT'
+        : outcome.status === 'provider_rejected'
+        ? 'AI_REJECTED'
+        : outcome.status === 'unavailable'
+        ? 'AI_UNAVAILABLE'
+        : outcome.status === 'refused' && outcome.reason === 'attempt_settled'
+        // Settled earlier, but its result never reached the item: retry is manual.
+        ? 'AI_RESULT_LOST'
+        : 'AI_UNCERTAIN';
+      const failed = await finish('rejected', null, code);
+      status = failed.status === 'applied' ? 'failed' : failed.status;
+    }
+  }
+  afterResponse(dispatchRunnable(5));
+  return json(req, requestId, 200, { status });
 }
 
 Deno.serve(async (req) => {
@@ -328,9 +438,9 @@ Deno.serve(async (req) => {
   try {
     const path = new URL(req.url).pathname.replace(/^.*?\/internal(?=\/v1\/)/, '');
     if (req.method === 'POST' && path === '/v1/jobs/claim') return await claim(req, requestId);
-    const jobMatch = /^\/v1\/jobs\/([^/]+)\/(complete|heartbeat|fail)$/.exec(path);
+    const jobMatch = /^\/v1\/jobs\/([^/]+)\/(complete|heartbeat|fail|ai)$/.exec(path);
     if (req.method === 'POST' && jobMatch && isUuid(jobMatch[1])) {
-      const handler = { complete, heartbeat, fail }[jobMatch[2] as 'complete' | 'heartbeat' | 'fail'];
+      const handler = { complete, heartbeat, fail, ai: runAi }[jobMatch[2] as 'complete' | 'heartbeat' | 'fail' | 'ai'];
       return await handler(req, requestId, jobMatch[1]!);
     }
     throw appError(404, 'NOT_FOUND');

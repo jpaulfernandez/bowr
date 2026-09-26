@@ -58,9 +58,11 @@ test.describe('P1.01 demo: add one piece and correct it without AI', () => {
     await expect(page.getByText(/privacy-sanitized copy of your photo/)).toBeVisible();
     await expectAccessible(page);
 
+    // Colors are measured from the cutout without AI: navy arrives on its own.
+    const navy = page.getByRole('group', { name: 'Colors' }).getByRole('checkbox', { name: 'Navy' });
+    await expect(navy).toHaveAttribute('aria-checked', 'true', { timeout: 30_000 });
     await page.getByRole('radiogroup', { name: 'Category' }).getByRole('radio', { name: 'Tops' }).click();
     await page.getByLabel('Name').fill('Blue Oxford');
-    await page.getByRole('group', { name: 'Colors' }).getByRole('checkbox', { name: 'Navy' }).click();
     await page.getByRole('button', { name: 'Save changes' }).click();
     await expect(page.getByText('Saved. Your edits take priority over suggestions.')).toBeVisible();
 
@@ -78,8 +80,8 @@ test.describe('P1.01 demo: add one piece and correct it without AI', () => {
     await tile.click();
     await expect(page).toHaveURL(new RegExp(`/wardrobe/items/${itemId}$`));
 
-    const [row] = await sql()`select count(*)::int as n, max(revision)::int as revision, max(category) as category from public.items where user_id = ${a.id}`;
-    expect(row).toEqual({ n: 1, revision: 2, category: 'tops' });
+    const [row] = await sql()`select count(*)::int as n, max(category) as category, max(name) as name from public.items where user_id = ${a.id}`;
+    expect(row).toEqual({ n: 1, category: 'tops', name: 'Blue Oxford' });
   });
 
   test('a failed cutout keeps the original viewable and the piece correctable', async ({ page }) => {
@@ -125,7 +127,14 @@ test.describe('P1.01 demo: add one piece and correct it without AI', () => {
     await shoes.focus();
     await page.keyboard.press('Enter');
     await expect(shoes).toHaveAttribute('aria-checked', 'true');
-    const swatch = page.getByRole('group', { name: 'Colors' }).getByRole('checkbox', { name: 'Brown' });
+    // Replace the measured navy with brown, by keyboard.
+    const colors = page.getByRole('group', { name: 'Colors' });
+    const navy = colors.getByRole('checkbox', { name: 'Navy' });
+    await expect(navy).toHaveAttribute('aria-checked', 'true', { timeout: 30_000 });
+    await navy.focus();
+    await page.keyboard.press('Enter');
+    await expect(navy).toHaveAttribute('aria-checked', 'false');
+    const swatch = colors.getByRole('checkbox', { name: 'Brown' });
     await swatch.focus();
     await page.keyboard.press('Enter');
     await expect(swatch).toHaveAttribute('aria-checked', 'true');

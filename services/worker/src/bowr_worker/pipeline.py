@@ -19,7 +19,9 @@ from typing import Any
 import httpx
 
 from . import models
+from .colors import dominant_colors
 from .cutout import cutout
+from .embedding import embed
 from .media import MediaRejected, normalize
 from .validation import validate
 
@@ -195,7 +197,67 @@ def _cutout_stage(job: dict[str, Any], lease: Lease, client: httpx.Client) -> di
     }
 
 
-STAGES = {"cutout": _cutout_stage}
+def _colors_stage(job: dict[str, Any], lease: Lease, client: httpx.Client) -> dict[str, Any] | None:
+    source = _download(client, job["sources"]["cutout"]["url"], job["input"]["max_bytes"])
+    if source is None:
+        raise MediaRejected("SOURCE_MISSING")
+    colors = dominant_colors(source, job["input"]["max_colors"])
+    if not colors:
+        raise MediaRejected("NO_FOREGROUND")
+    return {
+        "schema_version": 1,
+        "lease_generation": job["lease_generation"],
+        "outcome": "ready",
+        "result": {"suggested": {"colors": colors}},
+    }
+
+
+def _embedding_stage(job: dict[str, Any], lease: Lease, client: httpx.Client) -> dict[str, Any] | None:
+    spec = job["input"]
+    source = _download(client, job["sources"]["cutout"]["url"], spec["max_bytes"])
+    if source is None:
+        raise MediaRejected("SOURCE_MISSING")
+    try:
+        vector = embed(source, spec["model"], spec["model_revision"], spec["preprocess_version"])
+    except models.ModelUnavailable as missing:
+        raise MediaRejected("MODEL_UNAVAILABLE") from missing
+    return {
+        "schema_version": 1,
+        "lease_generation": job["lease_generation"],
+        "outcome": "ready",
+        "result": {
+            "model": spec["model"],
+            "model_revision": spec["model_revision"],
+            "preprocess_version": spec["preprocess_version"],
+            "vector": vector,
+        },
+    }
+
+
+STAGES = {"cutout": _cutout_stage, "colors": _colors_stage, "embedding": _embedding_stage}
+
+
+def _run_ai_stage(job: dict[str, Any], lease: Lease, client: httpx.Client, internal_api: str) -> str:
+    """Asks the internal gateway to run this claimed AI job. The gateway builds the
+    prompt, reserves budget, calls the provider, validates and applies the result;
+    the worker holds only the lease."""
+    body = {"schema_version": 1, "lease_generation": job["lease_generation"]}
+    validate("worker_ai_request", body)
+    try:
+        response = client.post(
+            f"{internal_api}/v1/jobs/{job['job_id']}/ai", json=body, headers=lease.auth(), timeout=90
+        )
+    except httpx.HTTPError:
+        return _report_failure(client, internal_api, lease, "TRANSIENT_STORAGE")
+    finally:
+        lease.stop()
+    if response.status_code != 200:
+        log.info("job %s ai request refused (%s)", job["job_id"], response.status_code)
+        return f"ai:{response.status_code}"
+    data = response.json()["data"]
+    validate("worker_ai_response", data)
+    log.info("job %s ai -> %s", job["job_id"], data["status"])
+    return f"ai:{data['status']}"
 
 
 def run_job(
@@ -219,6 +281,8 @@ def run_job(
 
     lease = Lease(job, internal_api, client, heartbeat_seconds)
     lease.start()
+    if item_stage and job["stage"] == "tags":
+        return _run_ai_stage(job, lease, client, internal_api)
     body: dict[str, Any] | None
     try:
         if before_process:

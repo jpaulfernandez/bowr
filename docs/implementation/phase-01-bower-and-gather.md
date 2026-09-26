@@ -36,9 +36,9 @@ Acceptance:
 Tasks:
 
 - [ ] **P1.02-T1** Implement independent foreground-color, normalized 512-dimensional FashionCLIP and guarded structured-tag stages. Version model/preprocess/media/prompt/schema identities; reject incompatible vector spaces. Include shoe, eyewear, headwear and accessory attributes.
-- [ ] **P1.02-T2** Persist bounded suggestions separately; apply only unchanged, unlocked field versions from the current media revision. User-cleared values remain locked. Offer explicit Use suggestion; mark inferred material and uncertain category honestly.
-- [ ] **P1.02-T3** Validate category/subcategory/formality/seasons/tags and output size at worker/API/DB boundaries. Build owner-filtered exact vector retrieval for later matching; no approximate index or new vector service.
-- [ ] **P1.02-T4** Expose processing/review states and explicit retry. Resolve safe retained-item blocked tagging after budget reset, but never regenerate on page open or retry ambiguous billed calls automatically.
+- [x] **P1.02-T2** Persist bounded suggestions separately; apply only unchanged, unlocked field versions from the current media revision. User-cleared values remain locked. Offer explicit Use suggestion; mark inferred material and uncertain category honestly.
+- [x] **P1.02-T3** Validate category/subcategory/formality/seasons/tags and output size at worker/API/DB boundaries. Build owner-filtered exact vector retrieval for later matching; no approximate index or new vector service.
+- [x] **P1.02-T4** Expose processing/review states and explicit retry. Resolve safe retained-item blocked tagging after budget reset, but never regenerate on page open or retry ambiguous billed calls automatically.
 
 Acceptance:
 
