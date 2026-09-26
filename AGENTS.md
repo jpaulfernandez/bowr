@@ -6,7 +6,7 @@ Instructions for coding agents working in this repository. Behavioral guidelines
 
 bowr is a private wardrobe, outfit-planning and fit-logging app for an owner and 2–10 invited friends. Members Gather photos of owned clothing into a Bower, Arrange outfits from real owned pieces, and Strut (confirm) what they wore.
 
-**Current state:** Phase 0 is in progress. Slice evidence lives in [docs/implementation/evidence/](docs/implementation/evidence/). Do not claim that commands, files, or tests exist until you have created them.
+**Current state:** Phases 0 and 1 are implemented on the local stack; their staging, device, paid-model and human-pilot gates remain open. Phase 2 is next. Slice evidence lives in [docs/implementation/evidence/](docs/implementation/evidence/). Do not claim that commands, files, or tests exist until you have created them.
 
 ## Source documents
 
@@ -124,6 +124,8 @@ Run from the repository root. Prerequisites: Node 22, pnpm 10, uv, Docker. Setup
 | E2E (Playwright + axe) | `pnpm build:web && pnpm test:e2e` |
 | Edge unit tests (Deno) | `pnpm test:functions` |
 | Worker tests (pytest) | `pnpm worker:test` |
+| Cutout benchmark (numbers only) | `pnpm worker:benchmark [--images DIR]` |
+| Blind extraction comparison (operator, billable) | `pnpm eval:extraction --dataset <manifest.json> --task <alias> --out <report.json>` (usage in `scripts/eval/extraction.ts`) |
 | Regenerate worker JSON contracts | `pnpm contracts:generate` (drift fails `pnpm test:unit`) |
 | Owner bootstrap (operator) | `DATABASE_URL=... pnpm ops:bootstrap-owner --user-id <uuid>` |
 | Recover missed maintenance (operator) | `pnpm ops:recover-maintenance` ([docs/runbooks/operations.md](docs/runbooks/operations.md)) |

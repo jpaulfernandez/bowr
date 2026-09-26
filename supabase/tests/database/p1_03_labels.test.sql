@@ -2,7 +2,7 @@
 -- outrank visual guesses.
 begin;
 \ir ../fixtures/auth.psql
-select plan(13);
+select plan(16);
 
 select tests.create_identity('a') as a_id \gset
 select tests.create_identity('b') as b_id \gset
@@ -49,6 +49,14 @@ select private.field_versions(i, array['material']) as base1 from public.items i
 select is((select private.apply_suggestion(i, 'vision', :'base1'::jsonb, '{"material":"cotton"}')
   from public.items i where i.id = :'item_id'), array[]::text[], 'a visual guess never replaces a label fact');
 select is((select material from public.items where id = :'item_id'), '100% linen', 'the printed material stays');
+-- The guess can land first, after the label's job took its versions: the label still wins.
+insert into public.items (user_id) values (:'a_id') returning id as item2_id \gset
+select private.field_versions(i, array['material']) as base2 from public.items i where i.id = :'item2_id' \gset
+select is((select private.apply_suggestion(i, 'vision', :'base2'::jsonb, '{"material":"cotton"}')
+  from public.items i where i.id = :'item2_id'), array['material'], 'a visual guess fills an empty material');
+select is((select private.apply_suggestion(i, 'label', :'base2'::jsonb, '{"material":"100% cotton"}')
+  from public.items i where i.id = :'item2_id'), array['material'], 'a label read from older versions replaces the later guess');
+select is((select material from public.items where id = :'item2_id'), '100% cotton', 'the printed material replaces the guess');
 
 -- Removal ------------------------------------------------------------------------------
 insert into public.media_assets (user_id, purpose, state, retention, width, height, content_type, byte_size, sha256)

@@ -2,7 +2,7 @@
 -- Auth removal, object deletion and racing processors live in supabase/tests/integration/p0_06_account.test.ts.
 begin;
 \ir ../fixtures/auth.psql
-select plan(27);
+select plan(29);
 
 update private.memberships set role = 'member' where role = 'owner';
 select tests.create_identity('owner', 'active', 'owner') as owner_id \gset
@@ -35,6 +35,15 @@ select throws_ok(format('select public.svc_verify_reauth_challenge(%L, %L, %L, n
 select throws_ok(format('select public.svc_verify_reauth_challenge(%L, %L, gen_random_uuid(), now() - interval ''1 second'', %L)',
   :'member_id', :'c1', repeat('a', 64)), 'PT403', 'REAUTH_REQUIRED',
   'a session authenticated before the challenge cannot verify it');
+-- Sign-in times come from the token in whole seconds, so a sign-in in the challenge's
+-- own second cannot be told from one just before it and is refused; the next second verifies.
+select public.svc_create_reauth_challenge(:'member_id', 'delete_account', gen_random_uuid()) ->> 'challenge_id' as c2 \gset
+update private.reauth_challenges set created_at = date_trunc('second', now()) + interval '400 milliseconds' where id = :'c2';
+select throws_ok(format('select public.svc_verify_reauth_challenge(%L, %L, gen_random_uuid(), %L, %L)', :'member_id', :'c2',
+  date_trunc('second', now()), repeat('a', 64)), 'PT403', 'REAUTH_REQUIRED',
+  'a sign-in in the same whole second as the challenge is refused as ambiguous');
+select lives_ok(format('select public.svc_verify_reauth_challenge(%L, %L, gen_random_uuid(), %L, %L)', :'member_id', :'c2',
+  date_trunc('second', now()) + interval '1 second', repeat('9', 64)), 'a sign-in in the next second verifies it');
 select throws_ok(format('select public.svc_verify_reauth_challenge(%L, %L, gen_random_uuid(), now(), %L)',
   :'other_id', :'c1', repeat('a', 64)), 'PT403', 'REAUTH_REQUIRED', 'another member cannot verify the challenge');
 update private.reauth_challenges set expires_at = now() - interval '1 second' where id = :'c1';

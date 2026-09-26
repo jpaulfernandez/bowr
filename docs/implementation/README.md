@@ -1,6 +1,6 @@
 # Implementation plan
 
-**Status:** Phase 0 in progress; slice evidence is in [evidence/](evidence/).  
+**Status:** Phases 0 and 1 are implemented on the local stack; their staging, device, paid-model and human-pilot gates remain open (unchecked tasks, recorded in each slice's evidence). Slice evidence is in [evidence/](evidence/).  
 **Prepared:** 25 September 2026.  
 **Baseline:** This repository currently contains specifications and local tooling configuration, with no application, migrations, worker, or test harness.
 

@@ -16,6 +16,9 @@ async function expectAccessible(page: Page) {
 /** Opens the fresh-auth link in a new tab of the same browser, as a person would. */
 async function openConfirmationLink(context: BrowserContext, email: string, since: number) {
   const link = await magicLinkFor(email, since);
+  // A sign-in is timed in whole seconds, so one in the challenge's own second is
+  // refused as ambiguous. A person can't click that fast; the harness waits for the next second.
+  await new Promise((resolve) => setTimeout(resolve, 1050 - (Date.now() % 1000)));
   const tab = await context.newPage();
   await tab.goto(link);
   await tab.waitForURL(/\/settings\/confirm$/);
