@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "lint": {
+    "rules": {
+      "tags": [
+        "recommended"
+      ]
+    },
+    "exclude": [
+      "_shared/generated/"
+    ]
+  },
+  "fmt": {
+    "lineWidth": 120,
+    "singleQuote": true,
+    "exclude": [
+      "_shared/generated/"
+    ]
+  }
+}

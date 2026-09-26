@@ -18,10 +18,10 @@ The original one-week estimate is high risk. P0.04 establishes the first measure
 
 Tasks:
 
-- [ ] **P0.01-T1** Scaffold the pnpm Expo/TypeScript workspace, shared contracts/domain/tokens, local Supabase and Python/uv worker skeleton. Pin compatible tool/runtime versions, lockfiles, model manifest format and `.env.example` names without secrets. Document setup and create test/build scripts from the shared strategy.
-- [ ] **P0.01-T2** Add profiles and private memberships, a minimal Auth trigger, fixed-authority owner bootstrap command, RLS/grants, hardened membership helper and revisioned/idempotent `update_profile`. Add same-owner conventions and initial AUTH fixtures.
-- [ ] **P0.01-T3** Implement `/`, `/auth`, `/auth/check-email`, `/auth/callback`, `/invite`, `/privacy`, `/wardrobe`, `/more`, `/settings` and safe bootstrap. Build public/pending/member/owner layouts and only available navigation; use DESIGN tokens, React Native primitives and platform adapters. Outfits/Strut become actionable in phase 2.
-- [ ] **P0.01-T4** Add tab-scoped auth storage, user-scoped query keys, pending/error rendering and account-change cancellation/cache disposal. Configure SPA export/deep-link rewrites, restrictive tested headers, no private service-worker cache, and web manifest.
+- [x] **P0.01-T1** Scaffold the pnpm Expo/TypeScript workspace, shared contracts/domain/tokens, local Supabase and Python/uv worker skeleton. Pin compatible tool/runtime versions, lockfiles, model manifest format and `.env.example` names without secrets. Document setup and create test/build scripts from the shared strategy.
+- [x] **P0.01-T2** Add profiles and private memberships, a minimal Auth trigger, fixed-authority owner bootstrap command, RLS/grants, hardened membership helper and revisioned/idempotent `update_profile`. Add same-owner conventions and initial AUTH fixtures.
+- [x] **P0.01-T3** Implement `/`, `/auth`, `/auth/check-email`, `/auth/callback`, `/invite`, `/privacy`, `/wardrobe`, `/more`, `/settings` and safe bootstrap. Build public/pending/member/owner layouts and only available navigation; use DESIGN tokens, React Native primitives and platform adapters. Outfits/Strut become actionable in phase 2.
+- [x] **P0.01-T4** Add tab-scoped auth storage, user-scoped query keys, pending/error rendering and account-change cancellation/cache disposal. Configure SPA export/deep-link rewrites, restrictive tested headers, no private service-worker cache, and web manifest.
 
 Acceptance:
 
@@ -37,10 +37,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P0.02-T1** Add private invite digests, redemptions, atomic throttles and audit records. Generate ≥128-bit random single-use codes, default seven-day expiry; return plaintext once. Lock membership/invite rows on redemption, enforce five attempts/hour/account plus IP throttle, and return a generic unavailable-code error.
-- [ ] **P0.02-T2** Build owner invite create/copy/revoke/status and safe member summary; pending gate supports paste, retry time, sign out and account deletion. No automatic message delivery; no private note/code in analytics or logs.
+- [x] **P0.02-T1** Add private invite digests, redemptions, atomic throttles and audit records. Generate ≥128-bit random single-use codes, default seven-day expiry; return plaintext once. Lock membership/invite rows on redemption, enforce five attempts/hour/account plus IP throttle, and return a generic unavailable-code error.
+- [x] **P0.02-T2** Build owner invite create/copy/revoke/status and safe member summary; pending gate supports paste, retry time, sign out and account deletion. No automatic message delivery; no private note/code in analytics or logs.
 - [ ] **P0.02-T3** Configure staging Google OAuth/PKCE, exact callbacks and verified custom SMTP. Implement expired-link/resend/change-email and cross-browser recovery. Add onboarding privacy text, skip/explore, and availability-aware next actions.
-- [ ] **P0.02-T4** Implement hourly pending-account cleanup after 24 hours with lock/recheck/deleting transition; failed Auth deletion stays retryable. Establish private API error mapping and idempotency envelopes for these commands.
+- [x] **P0.02-T4** Implement hourly pending-account cleanup after 24 hours with lock/recheck/deleting transition; failed Auth deletion stays retryable. Establish private API error mapping and idempotency envelopes for these commands.
 
 Acceptance:
 
@@ -56,10 +56,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P0.03-T1** Add upload batches/entries, media metadata, private object manifest, mutation identities and asset lifecycle. Create signed PUT/renew/complete and media-access APIs; clients supply descriptors/asset IDs, never object keys. Use stable file identities and typed attachments.
+- [x] **P0.03-T1** Add upload batches/entries, media metadata, private object manifest, mutation identities and asset lifecycle. Create signed PUT/renew/complete and media-access APIs; clients supply descriptors/asset IDs, never object keys. Use stable file identities and typed attachments.
 - [ ] **P0.03-T2** Configure private staging R2 bucket and exact-origin CORS. Use 10-minute PUT and 5-minute GET defaults, clipped to temporary expiry; `no-store` responses and memory-only images. Separate writable quarantine keys from server-controlled validated objects.
-- [ ] **P0.03-T3** Implement worker decode/normalization contract: 20 MiB and 40 MP bounds, orientation/rotation, sRGB, EXIF/GPS removal, sanitized 1024 px original and 2048 px care-label exception. Pin and prove HEIC decoder before advertising it; reject animations/unsupported/corrupt bytes. Introduce the minimal persisted validation-job identity and authenticated scoped dispatch/callback needed for this path now; P0.04 completes its lease/recovery behavior. Do not create a disposable synchronous or unauthenticated worker path.
-- [ ] **P0.03-T4** Build receipt/status, per-file validation failure, camera-denied/file-picker alternative and expired-image refresh-once behavior. Introduce temporary deletion tasks; cancel rejects access and rechecks raw keys after PUT expiry.
+- [x] **P0.03-T3** Implement worker decode/normalization contract: 20 MiB and 40 MP bounds, orientation/rotation, sRGB, EXIF/GPS removal, sanitized 1024 px original and 2048 px care-label exception. Pin and prove HEIC decoder before advertising it; reject animations/unsupported/corrupt bytes. Introduce the minimal persisted validation-job identity and authenticated scoped dispatch/callback needed for this path now; P0.04 completes its lease/recovery behavior. Do not create a disposable synchronous or unauthenticated worker path.
+- [x] **P0.03-T4** Build receipt/status, per-file validation failure, camera-denied/file-picker alternative and expired-image refresh-once behavior. Introduce temporary deletion tasks; cancel rejects access and rechecks raw keys after PUT expiry.
 
 Acceptance:
 
@@ -75,10 +75,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P0.04-T1** Complete the private jobs/payloads introduced by P0.03 with dependency and dedupe identity, queued/running/retry/blocked/review/terminal states. Commit validation jobs with upload completion; connect existing receipt to durable status.
-- [ ] **P0.04-T2** Implement authenticated Modal wake-up, single-use claim nonce, job/stage-scoped execution capabilities, claim locks, lease generation and fenced callbacks. Worker gets no general database, Gemini or R2 master key.
-- [ ] **P0.04-T3** Add heartbeat, bounded concurrency/deadlines, maximum three deterministic attempts, immutable output/checksum handling and canceled-target cleanup. Start from architecture limits, then measure before tuning.
-- [ ] **P0.04-T4** Schedule minute dispatch/reconciliation using protected maintenance credentials; recover missed dispatch and expired leases. Poll 2/5/10 seconds while visible, stop at terminal state, refetch on focus. Expose safe failure codes and manual retry/cancel.
+- [x] **P0.04-T1** Complete the private jobs/payloads introduced by P0.03 with dependency and dedupe identity, queued/running/retry/blocked/review/terminal states. Commit validation jobs with upload completion; connect existing receipt to durable status.
+- [x] **P0.04-T2** Implement authenticated Modal wake-up, single-use claim nonce, job/stage-scoped execution capabilities, claim locks, lease generation and fenced callbacks. Worker gets no general database, Gemini or R2 master key.
+- [x] **P0.04-T3** Add heartbeat, bounded concurrency/deadlines, maximum three deterministic attempts, immutable output/checksum handling and canceled-target cleanup. Start from architecture limits, then measure before tuning.
+- [x] **P0.04-T4** Schedule minute dispatch/reconciliation using protected maintenance credentials; recover missed dispatch and expired leases. Poll 2/5/10 seconds while visible, stop at terminal state, refetch on focus. Expose safe failure codes and manual retry/cancel.
 
 Acceptance:
 
@@ -94,10 +94,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P0.05-T1** Add budget periods, per-attempt `ai_usage`, cross-period holds and atomic reservation/dispatch/settlement functions in integer USD micros. Enforce lighter/stop/ceiling ordering and defaults $8/$9.50/$10, with UTC month reset.
-- [ ] **P0.05-T2** Implement the internal-only AI gateway: server task aliases, counted inputs, bounded billed output/thinking, effective-dated prices, schema validation, unique attempts, and no direct worker/client provider access. Unknown price/bound/accounting state fails closed.
-- [ ] **P0.05-T3** Implement uncertain dispatch holds, separately reserved explicit retry/repair, cancellation settlement, chronological period locks, rollover holds and tariff recheck before dispatch. An actual charge above reservation pauses AI and alerts.
-- [ ] **P0.05-T4** Build admin spend actual/reserved/unknown/task/member summaries and deliberate revisioned threshold changes. Bootstrap/member status supplies mode and local reset time without others' usage; normal/lighter/paused/provider-error states are distinct.
+- [x] **P0.05-T1** Add budget periods, per-attempt `ai_usage`, cross-period holds and atomic reservation/dispatch/settlement functions in integer USD micros. Enforce lighter/stop/ceiling ordering and defaults $8/$9.50/$10, with UTC month reset.
+- [x] **P0.05-T2** Implement the internal-only AI gateway: server task aliases, counted inputs, bounded billed output/thinking, effective-dated prices, schema validation, unique attempts, and no direct worker/client provider access. Unknown price/bound/accounting state fails closed.
+- [x] **P0.05-T3** Implement uncertain dispatch holds, separately reserved explicit retry/repair, cancellation settlement, chronological period locks, rollover holds and tariff recheck before dispatch. An actual charge above reservation pauses AI and alerts.
+- [x] **P0.05-T4** Build admin spend actual/reserved/unknown/task/member summaries and deliberate revisioned threshold changes. Bootstrap/member status supplies mode and local reset time without others' usage; normal/lighter/paused/provider-error states are distinct.
 - [ ] **P0.05-T5** Verify real paid Gemini project, current approved model IDs/prices, output bounds, billing period and available cap/prepaid settings; record configuration, disable automatic top-up where supported. Add budget-mode analytics using only allowed fields. The test runner stays operator-only.
 
 Acceptance:
@@ -115,10 +115,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P0.06-T1** Complete settings for display name, optional city, locale/timezone, units, sign out, privacy and account deletion. Add owner suspension with explicit consequences and no wardrobe/photo/profile access through administration.
-- [ ] **P0.06-T2** Implement action-bound ten-minute fresh-auth challenges, single-use proofs, transactional ownership transfer and last-owner deletion rules. A refreshed access token alone cannot prove fresh authentication.
-- [ ] **P0.06-T3** Build recoverable account deletion: mark deleting, block signing/reads/jobs, revoke sessions, capture asset manifest, delete domain/Auth data, detach safe accounting identity, preserve other members and nullable invite relationships. Provide restricted expiring deletion-status capability.
-- [ ] **P0.06-T4** Add lifecycle extension hooks for later domain cleanup, cache/object-URL disposal and analytics identity deletion/reset. UI distinguishes pending deletion from verified object absence.
+- [x] **P0.06-T1** Complete settings for display name, optional city, locale/timezone, units, sign out, privacy and account deletion. Add owner suspension with explicit consequences and no wardrobe/photo/profile access through administration.
+- [x] **P0.06-T2** Implement action-bound ten-minute fresh-auth challenges, single-use proofs, transactional ownership transfer and last-owner deletion rules. A refreshed access token alone cannot prove fresh authentication.
+- [x] **P0.06-T3** Build recoverable account deletion: mark deleting, block signing/reads/jobs, revoke sessions, capture asset manifest, delete domain/Auth data, detach safe accounting identity, preserve other members and nullable invite relationships. Provide restricted expiring deletion-status capability.
+- [x] **P0.06-T4** Add lifecycle extension hooks for later domain cleanup, cache/object-URL disposal and analytics identity deletion/reset. UI distinguishes pending deletion from verified object absence.
 
 Acceptance:
 
@@ -134,10 +134,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P0.07-T1** Create CI for contracts/types, RLS/integration/worker checks, web export and immutable worker build; staging promotion order is additive migration → compatible worker/internal → public API → web. Document artifact rollback and environment/secret inventory.
-- [ ] **P0.07-T2** Implement five-minute temporary cleanup, daily orphan reconciliation and expiry checks at sign/read/callback. Measure one-hour abandoned-upload cleanup and 24-hour retained-asset deletion targets; install an independent missed-heartbeat/stuck-work alert and manual recovery command.
-- [ ] **P0.07-T3** Configure encrypted daily DB exports, seven-day retention and an external minimal deletion journal. Rehearse isolated Auth/schema restore, deletion replay, expired-session purge, stale job/AI disablement and media existence reconciliation. Document 24-hour RPO/one-day restoration targets and absence of independent retained-media backup.
-- [ ] **P0.07-T4** Wire allowlisted PostHog events with recording/autocapture/automatic URL capture off; scrub errors and route templates. Add redacted operational health/spend/deletion summaries and infrastructure resource alerts without a new monitoring platform.
+- [x] **P0.07-T1** Create CI for contracts/types, RLS/integration/worker checks, web export and immutable worker build; staging promotion order is additive migration → compatible worker/internal → public API → web. Document artifact rollback and environment/secret inventory.
+- [x] **P0.07-T2** Implement five-minute temporary cleanup, daily orphan reconciliation and expiry checks at sign/read/callback. Measure one-hour abandoned-upload cleanup and 24-hour retained-asset deletion targets; install an independent missed-heartbeat/stuck-work alert and manual recovery command.
+- [x] **P0.07-T3** Configure encrypted daily DB exports, seven-day retention and an external minimal deletion journal. Rehearse isolated Auth/schema restore, deletion replay, expired-session purge, stale job/AI disablement and media existence reconciliation. Document 24-hour RPO/one-day restoration targets and absence of independent retained-media backup.
+- [x] **P0.07-T4** Wire allowlisted PostHog events with recording/autocapture/automatic URL capture off; scrub errors and route templates. Add redacted operational health/spend/deletion summaries and infrastructure resource alerts without a new monitoring platform.
 
 Acceptance:
 
@@ -149,8 +149,10 @@ Acceptance:
 ## Phase exit and rollback
 
 - [ ] Real friend admission/private-upload/zero-AI demo passes; all P0 acceptance evidence exists.
-- [ ] Ownership, invite/cleanup races, worker recovery, budget concurrency and account deletion pass against actual transactions.
+- [x] Ownership, invite/cleanup races, worker recovery, budget concurrency and account deletion pass against actual transactions.
 - [ ] Real SMTP/R2/Modal configuration, format support and paid-model gates are recorded; unresolved provider gates are explicitly disabled.
-- [ ] Cleanup and deletion-aware restore are demonstrated; published privacy text matches observed behavior.
+- [x] Cleanup and deletion-aware restore are demonstrated; published privacy text matches observed behavior.
+
+Exit status (26 September 2026): every P0 slice passes its local acceptance against the real local stack; evidence is in [evidence/](evidence/). The deletion-aware restore is demonstrated locally (P0.07-A2 local rehearsal); its staging rehearsal remains a P0.07 gate. The two open items wait on staging and provider accounts: SMTP and Google OAuth (P0.02-T3), R2 and Modal with HEIC (P0.03-T2), paid Gemini (P0.05-T5), and the deployed heartbeat, restore and rollback checks (P0.07-A1/A2/A4). Until then, AI stays disabled (`AI_ENABLED=false`), Google sign-in stays hidden (`EXPO_PUBLIC_AUTH_GOOGLE_ENABLED=false`), and HEIC stays unadvertised (`UPLOAD_HEIC_ENABLED=false`) outside local.
 
 Disable AI/processing admission independently during incidents; keep membership and safe reads intact where services permit. Roll back immutable compatible artifacts, retain ledger/deletion manifests, and drain cleanup. Never clear uncertain spend or destructively roll back production schema to recover availability.

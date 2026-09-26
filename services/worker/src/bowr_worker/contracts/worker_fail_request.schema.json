@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "number",
+      "const": 1
+    },
+    "lease_generation": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "failure_code": {
+      "type": "string",
+      "enum": [
+        "TRANSIENT_STORAGE",
+        "WORKER_ERROR",
+        "DEADLINE_EXCEEDED"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "lease_generation",
+    "failure_code"
+  ],
+  "additionalProperties": false
+}

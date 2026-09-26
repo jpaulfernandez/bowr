@@ -1,0 +1,27 @@
+node_modules/
+.pnpm-store/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+coverage/
+test-results/
+playwright-report/
+.DS_Store
+
+# Expo / web export
+apps/app/.expo/
+apps/app/dist/
+apps/app/expo-env.d.ts
+
+# Supabase local state
+supabase/.branches/
+supabase/.temp/
+supabase/functions/.env
+
+# Python
+services/worker/.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+apps/app/.vercel/

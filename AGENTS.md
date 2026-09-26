@@ -6,7 +6,7 @@ Instructions for coding agents working in this repository. Behavioral guidelines
 
 bowr is a private wardrobe, outfit-planning and fit-logging app for an owner and 2–10 invited friends. Members Gather photos of owned clothing into a Bower, Arrange outfits from real owned pieces, and Strut (confirm) what they wore.
 
-**Current state:** specifications only. No application code, migrations, worker, or test harness exists yet. Do not claim that commands, files, or tests exist until you have created them.
+**Current state:** Phase 0 is in progress. Slice evidence lives in [docs/implementation/evidence/](docs/implementation/evidence/). Do not claim that commands, files, or tests exist until you have created them.
 
 ## Source documents
 
@@ -107,4 +107,27 @@ A slice is done only when its acceptance cases pass against the real local stack
 
 ## Commands
 
-None yet. Phase 0 (P0.01) scaffolds the repository and must record the actual lint, type-check, test, migration-reset, and build commands here once they exist.
+Run from the repository root. Prerequisites: Node 22, pnpm 10, uv, Docker. Setup is in [README.md](README.md).
+
+| Purpose | Command |
+| --- | --- |
+| Install | `pnpm install` and `(cd services/worker && uv sync)` |
+| Fast checks (lint, types, unit, worker) | `pnpm check` |
+| Lint | `pnpm lint` (ESLint, `deno lint`/`fmt --check` for Edge Functions, ruff) |
+| Type-check | `pnpm typecheck` (app, packages, Edge Functions via `deno check`) |
+| Unit tests (Vitest) | `pnpm test:unit` |
+| Local stack | `pnpm db:start` then `pnpm storage:start` (R2 stand-in) `pnpm worker:serve` (worker) and `pnpm fake-ai:serve` (deterministic Gemini stand-in); stop with `pnpm storage:stop` / `pnpm db:stop` |
+| Migration reset | `pnpm db:reset` |
+| Database tests (pgTAP) | `pnpm test:db` |
+| Integration tests (races, Edge API) | `pnpm test:integration` (needs `pnpm db:start`) |
+| Web export + bundle inspection | `pnpm build:web` |
+| E2E (Playwright + axe) | `pnpm build:web && pnpm test:e2e` |
+| Edge unit tests (Deno) | `pnpm test:functions` |
+| Worker tests (pytest) | `pnpm worker:test` |
+| Regenerate worker JSON contracts | `pnpm contracts:generate` (drift fails `pnpm test:unit`) |
+| Owner bootstrap (operator) | `DATABASE_URL=... pnpm ops:bootstrap-owner --user-id <uuid>` |
+| Recover missed maintenance (operator) | `pnpm ops:recover-maintenance` ([docs/runbooks/operations.md](docs/runbooks/operations.md)) |
+| Encrypted DB export / restore rehearsal (operator) | `pnpm ops:backup-db` / `pnpm ops:restore-rehearsal` ([docs/runbooks/backup-restore.md](docs/runbooks/backup-restore.md)) |
+| CI | `.github/workflows/ci.yml` runs `pnpm check`, then the stack suites above; promotion and rollback in [docs/runbooks/deploy.md](docs/runbooks/deploy.md) |
+
+Use `npx expo install <pkg>` inside `apps/app` to add Expo/React Native packages at SDK-compatible versions.

@@ -1,6 +1,6 @@
 # Implementation plan
 
-**Status:** Planned; no implementation or test execution is claimed.  
+**Status:** Phase 0 in progress; slice evidence is in [evidence/](evidence/).  
 **Prepared:** 25 September 2026.  
 **Baseline:** This repository currently contains specifications and local tooling configuration, with no application, migrations, worker, or test harness.
 

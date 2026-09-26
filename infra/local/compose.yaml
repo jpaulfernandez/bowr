@@ -1,0 +1,28 @@
+# Local-only services that stand in for hosted providers.
+# Start after `pnpm db:start` (it creates the supabase_network_bowr network).
+name: bowr-local
+
+services:
+  # S3-compatible gateway standing in for the private Cloudflare R2 bucket.
+  # versitygw enforces SigV4 presigned signatures, expiry and bucket CORS rules.
+  storage:
+    image: versity/versitygw@sha256:30292fc2eeacc67a36993b01f7a7a5e3361a19cced0e80c1d71cfa2a4b0a2499 # v1.8.0
+    container_name: bowr_storage
+    entrypoint: ["sh", "-c", "mkdir -p /data && exec versitygw --region auto posix /data"]
+    environment:
+      ROOT_ACCESS_KEY: local-storage-access-key
+      ROOT_SECRET_KEY: local-storage-secret-key-0123456789abcdef
+    ports:
+      - "127.0.0.1:9000:7070"
+    volumes:
+      - storage-data:/data
+    networks:
+      - supabase
+
+volumes:
+  storage-data:
+
+networks:
+  supabase:
+    external: true
+    name: supabase_network_bowr

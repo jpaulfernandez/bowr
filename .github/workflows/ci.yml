@@ -1,0 +1,105 @@
+# P0.07-T1: every change runs contracts/types, RLS/integration/worker checks, the
+# web export and the immutable worker build against the real local stack. No
+# billable provider is contacted: Gemini, storage and the worker run locally.
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, types, unit, Edge and worker tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v6
+      - run: pnpm install --frozen-lockfile
+      - run: uv sync --frozen
+        working-directory: services/worker
+      # Includes the generated-contract drift check (pnpm test:unit).
+      - run: pnpm check
+
+  stack:
+    name: Database, integration and E2E on the local stack
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v6
+      - run: pnpm install --frozen-lockfile
+      - run: uv sync --frozen
+        working-directory: services/worker
+      - name: Local-only environment files
+        run: |
+          cp supabase/functions/.env.example supabase/functions/.env
+          cp apps/app/.env.example apps/app/.env.local
+      - run: pnpm db:start
+      - name: Publishable key for the web build
+        run: |
+          key=$(pnpm exec supabase status -o json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s.slice(s.indexOf("{"))).PUBLISHABLE_KEY))')
+          sed -i "s|^EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=.*|EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${key}|" apps/app/.env.local
+      - run: pnpm storage:start
+      - name: Start the local worker and fake Gemini
+        run: |
+          nohup pnpm worker:serve > worker.log 2>&1 &
+          nohup pnpm fake-ai:serve > fake-ai.log 2>&1 &
+      - run: pnpm test:db
+      - run: pnpm test:integration
+      - run: pnpm build:web
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - name: Failure diagnostics (no secrets; local fixtures only)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stack-diagnostics
+          path: |
+            test-results/
+            worker.log
+            fake-ai.log
+          retention-days: 7
+
+  artifacts:
+    name: Immutable build artifacts
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      # The Modal image is built from this exact lockfile and source (modal_app.py).
+      - name: Worker build from the frozen lockfile
+        working-directory: services/worker
+        run: |
+          uv lock --check
+          uv build --wheel --out-dir dist
+          cp uv.lock dist/
+          sha256sum dist/* > dist/SHA256SUMS
+          cat dist/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: worker-${{ github.sha }}
+          path: services/worker/dist/
+          retention-days: 30

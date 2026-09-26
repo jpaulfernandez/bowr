@@ -1,0 +1,39 @@
+# P0.07-T2: an external missed-heartbeat and stuck-work check. It runs outside
+# Supabase, so a paused project or a stopped pg_cron scheduler is still noticed.
+# A failed run notifies the repository's watchers through GitHub's normal
+# workflow-failure email. Recovery: docs/runbooks/operations.md.
+name: Heartbeat
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    # Enabled per environment once it is deployed (docs/runbooks/operations.md).
+    if: vars.HEALTH_CHECK_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: staging
+    steps:
+      - name: Check maintenance health
+        env:
+          HEALTH_URL: ${{ secrets.HEALTH_URL }}
+          HEALTH_CHECK_TOKEN: ${{ secrets.HEALTH_CHECK_TOKEN }}
+        run: |
+          if [ -z "$HEALTH_URL" ] || [ -z "$HEALTH_CHECK_TOKEN" ]; then
+            echo "::error::HEALTH_URL and HEALTH_CHECK_TOKEN are not configured for this environment"
+            exit 1
+          fi
+          status=$(curl -sS -o health.json -w '%{http_code}' --max-time 30 \
+            -H "Authorization: Bearer ${HEALTH_CHECK_TOKEN}" "$HEALTH_URL" || echo 000)
+          # The report holds task names, times and counts only.
+          cat health.json || true
+          if [ "$status" != "200" ]; then
+            echo "::error::bowr maintenance health returned ${status}"
+            exit 1
+          fi
