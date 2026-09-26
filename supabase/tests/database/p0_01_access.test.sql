@@ -39,7 +39,7 @@ select is(
   (select coalesce(array_agg(g order by g), '{}') from (select format('%s:%s:%s', grantee, table_name, privilege_type) as g
      from information_schema.role_table_grants
     where table_schema = 'public' and grantee in ('anon', 'authenticated')) grants),
-  array['authenticated:item_assets:SELECT', 'authenticated:item_stages:SELECT', 'authenticated:item_suggestions:SELECT', 'authenticated:items:SELECT',
+  array['authenticated:duplicate_reviews:SELECT', 'authenticated:item_assets:SELECT', 'authenticated:item_stages:SELECT', 'authenticated:item_suggestions:SELECT', 'authenticated:items:SELECT',
     'authenticated:media_assets:SELECT', 'authenticated:upload_batches:SELECT', 'authenticated:upload_entries:SELECT'],
   'table-wide grants to anon/authenticated in public are exactly the owner-filtered reads');
 select is(

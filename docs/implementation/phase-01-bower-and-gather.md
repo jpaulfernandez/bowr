@@ -73,10 +73,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P1.04-T1** Add grouped-photo choice and crop proposals/manual rectangles. Require Keep as one set or explicit selected parts; validate normalized oriented coordinates and maximum 20 parts/source. No automatic multi-item creation.
-- [ ] **P1.04-T2** Implement `confirm-parts` atomically with stable source-part IDs, independent normalized item crops and jobs. Shared grouped original stays temporary; confirmed item assets get independent lifecycle.
-- [ ] **P1.04-T3** Add same-owner sanitized hash and category/vector duplicate comparisons, with Use existing, Add another, Decide later. Delay creating a second item when a duplicate decision is pending; intentional identical garments remain distinct.
-- [ ] **P1.04-T4** Support manual crops/keep-one with AI paused; retain label-to-item assignment and clean rejected crops/source media through the existing deletion service.
+- [x] **P1.04-T1** Add grouped-photo choice and crop proposals/manual rectangles. Require Keep as one set or explicit selected parts; validate normalized oriented coordinates and maximum 20 parts/source. No automatic multi-item creation.
+- [x] **P1.04-T2** Implement `confirm-parts` atomically with stable source-part IDs, independent normalized item crops and jobs. Shared grouped original stays temporary; confirmed item assets get independent lifecycle.
+- [x] **P1.04-T3** Add same-owner sanitized hash and category/vector duplicate comparisons, with Use existing, Add another, Decide later. Delay creating a second item when a duplicate decision is pending; intentional identical garments remain distinct.
+- [x] **P1.04-T4** Support manual crops/keep-one with AI paused; retain label-to-item assignment and clean rejected crops/source media through the existing deletion service.
 
 Acceptance:
 

@@ -7,6 +7,7 @@ import { Button } from '../../../../components/Button';
 import { RadioGroup } from '../../../../components/RadioGroup';
 import { Screen } from '../../../../components/Screen';
 import { Heading, Text } from '../../../../components/Text';
+import { DuplicateChoice, useDuplicateReviews } from '../../../../features/items/DuplicateChoice';
 import { LabelsSection } from '../../../../features/items/LabelsSection';
 import { PieceEditor } from '../../../../features/items/PieceEditor';
 import { PieceImage } from '../../../../features/items/PieceImage';
@@ -30,6 +31,8 @@ export default function PieceDetail() {
   const [view, setView] = useState<'cutout' | 'original' | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const { width } = useWindowDimensions();
+  const reviews = useDuplicateReviews('item_id', typeof id === 'string' ? [id] : []);
+  const review = reviews.data?.find((r) => r.state === 'pending') ?? null;
 
   if (item.isPending) return <Screen title="Piece" />;
   if (item.isError || !item.data) {
@@ -56,6 +59,15 @@ export default function PieceDetail() {
 
   return (
     <Screen title={displayName(piece)} subtitle={piece.category ? categoryLabel[piece.category] : 'Category not set'}>
+      {review ? (
+        <View className="max-w-prose">
+          <DuplicateChoice
+            review={review}
+            label="this piece"
+            photo={<PieceImage item={piece} size={120} label={`${displayName(piece)}, this new piece`} />}
+          />
+        </View>
+      ) : null}
       <View className="flex-row flex-wrap gap-8">
         <View className="gap-3" style={{ width: imageSize, maxWidth: '100%' }}>
           <PieceImage item={piece} size={imageSize} view={shown} label={`${displayName(piece)}, ${shown === 'cutout' ? 'cutout' : 'original photo'}`} />

@@ -77,7 +77,7 @@ const guides: Guide[] = [
     how: ['Place them on dark fabric, close up. Several small pieces can share one photo.'],
     watch: [
       'Glare on metal: use indirect light.',
-      'Before pieces are created from a group photo, you choose to keep it as one set or split it into pieces.',
+      'In Gather, mark a group photo as several small pieces. Nothing is added until you keep it as one set or mark each piece.',
     ],
   },
   {

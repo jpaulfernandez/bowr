@@ -5,7 +5,7 @@ export type JobCapability = {
   user_id: string;
   /** Validation: the upload's asset. Item stages: the item. */
   target_id: string;
-  stage: 'validate_upload' | 'cutout' | 'colors' | 'embedding' | 'tags' | 'label';
+  stage: 'validate_upload' | 'crop' | 'cutout' | 'colors' | 'embedding' | 'tags' | 'label';
   lease_generation: number;
   /** Rendition name -> server-chosen object key. */
   output_keys: Record<string, string>;

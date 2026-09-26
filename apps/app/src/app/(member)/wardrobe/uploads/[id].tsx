@@ -8,6 +8,7 @@ import { Banner } from '../../../../components/Banner';
 import { Button } from '../../../../components/Button';
 import { Screen } from '../../../../components/Screen';
 import { Text } from '../../../../components/Text';
+import { DuplicateChoice, useDuplicateReviews } from '../../../../features/items/DuplicateChoice';
 import { entryStatus } from '../../../../features/uploads/copy';
 import { PrivateImage } from '../../../../features/uploads/PrivateImage';
 import { uploadManager, useLocalUploads } from '../../../../features/uploads/upload-manager';
@@ -27,10 +28,11 @@ const Entries = z.array(
     failure_code: z.string().nullable(),
     declared_content_type: z.string(),
     created_at: z.string(),
-    purpose: z.enum(['garment', 'care_label']),
+    purpose: z.enum(['garment', 'care_label', 'grouped']),
     parent_entry_id: z.string().uuid().nullable(),
     target_item_id: z.string().uuid().nullable(),
-    items: z.array(z.object({ id: z.string().uuid() })),
+    split_confirmed_at: z.string().nullable(),
+    items: z.array(z.object({ id: z.string().uuid(), lifecycle: z.string() })),
   }),
 );
 type Entry = z.infer<typeof Entries>[number];
@@ -54,7 +56,9 @@ export default function UploadReceipt() {
         await guardedRead(() =>
           supabase
             .from('upload_entries')
-            .select('id, asset_id, state, failure_code, declared_content_type, created_at, purpose, parent_entry_id, target_item_id, items!items_user_id_source_entry_id_fkey(id)')
+            .select(
+              'id, asset_id, state, failure_code, declared_content_type, created_at, purpose, parent_entry_id, target_item_id, split_confirmed_at, items!items_user_id_source_entry_id_fkey(id, lifecycle)',
+            )
             .eq('batch_id', id)
             .order('created_at')
             .order('id')
@@ -96,6 +100,12 @@ export default function UploadReceipt() {
     refetchIntervalInBackground: false,
   });
   const [attentionOnly, setAttentionOnly] = useState(false);
+  // A garment photo that repeats a piece already in the Bower waits for a choice.
+  const held = (entries.data ?? []).filter((e) => e.purpose === 'garment' && e.state === 'ready' && e.items.length === 0).map((e) => e.id);
+  const reviews = useDuplicateReviews('entry_id', held);
+  const reviewOf = (entry: Entry) => reviews.data?.find((r) => r.entry_id === entry.id) ?? null;
+  const pieces = (entry: Entry) => entry.items.filter((i) => i.lifecycle !== 'deleted');
+  const awaitingParts = (entry: Entry) => entry.purpose === 'grouped' && entry.state === 'ready' && entry.split_confirmed_at === null;
 
   const cancel = useMutation({
     mutationFn: (entryId: string) =>
@@ -137,6 +147,8 @@ export default function UploadReceipt() {
     return parent && ['rejected', 'failed', 'canceled'].includes(parent.state) ? 'unattached' : 'waiting';
   };
   const needsAttention = (entry: Entry) =>
+    awaitingParts(entry) ||
+    reviewOf(entry)?.state === 'pending' ||
     entry.state === 'rejected' ||
     entry.state === 'failed' ||
     labelState(entry) === 'unattached' ||
@@ -177,10 +189,21 @@ export default function UploadReceipt() {
         {shown.map((entry, index) => {
           const task = local.get(entry.id);
           const number = numberOf(entry.id);
-          const label = `Photo ${number}${task ? `: ${task.name}` : ''}${entry.purpose === 'care_label' ? ' (care label)' : ''}`;
+          const label = `Photo ${number}${task ? `: ${task.name}` : ''}${entry.purpose === 'care_label' ? ' (care label)' : entry.purpose === 'grouped' ? ' (group photo)' : ''}`;
           const attached = labelState(entry);
-          const status =
-            attached === 'attached'
+          const review = reviewOf(entry);
+          const made = pieces(entry);
+          const status = awaitingParts(entry)
+            ? 'Several pieces in one photo · choose how to add them'
+            : entry.purpose === 'grouped' && entry.split_confirmed_at
+              ? made.length === 1
+                ? '1 piece added'
+                : `${made.length} pieces added`
+              : review?.state === 'pending'
+                ? 'Already in your Bower? Choose below.'
+                : review?.state === 'use_existing'
+                  ? 'Kept your existing piece; no new piece added'
+                  : attached === 'attached'
               ? 'Care label attached to its piece'
               : attached === 'waiting'
                 ? entry.parent_entry_id
@@ -189,9 +212,11 @@ export default function UploadReceipt() {
                 : attached === 'unattached'
                   ? "Not attached: its piece's photo couldn't be used. This label will be removed."
                   : entryStatus(entry.state, task, entry.failure_code);
+          // A confirmed group photo and a repeated photo are deleted once they have served.
+          const photoKept = entry.state === 'ready' && !entry.split_confirmed_at && review?.state !== 'use_existing';
           return (
             <View role="listitem" key={entry.id} className={`flex-row flex-wrap gap-4 p-4 ${index === 0 ? '' : 'border-t border-divider'}`}>
-              {entry.state === 'ready' ? (
+              {photoKept ? (
                 <PrivateImage assetId={entry.asset_id} label={`${label}, uploaded photo`} />
               ) : (
                 <View aria-hidden style={{ width: 96, height: 96 }} className="rounded-image bg-surface-subtle" />
@@ -199,13 +224,40 @@ export default function UploadReceipt() {
               <View className="min-w-0 flex-1 basis-[160px] gap-2">
                 <Text className="text-action text-text">{label}</Text>
                 <Text className={needsAttention(entry) ? 'text-secondary text-error' : 'text-secondary text-text-secondary'}>{status}</Text>
+                {review?.state === 'pending' ? (
+                  <DuplicateChoice
+                    review={review}
+                    label={`photo ${number}`}
+                    photo={<PrivateImage assetId={entry.asset_id} label={`Photo ${number}, just uploaded`} size={120} />}
+                  />
+                ) : null}
                 <View className="flex-row flex-wrap gap-2">
-                  {entry.items[0] ? (
+                  {made.length === 1 ? (
                     <Button
                       label={`View piece from photo ${number}`}
                       variant="secondary"
-                      onPress={() => router.push(`/wardrobe/items/${entry.items[0]!.id}`)}
+                      onPress={() => router.push(`/wardrobe/items/${made[0]!.id}`)}
                     />
+                  ) : null}
+                  {made.length > 1
+                    ? made.map((piece, k) => (
+                        <Button
+                          key={piece.id}
+                          label={`View piece ${k + 1} from photo ${number}`}
+                          variant="secondary"
+                          onPress={() => router.push(`/wardrobe/items/${piece.id}`)}
+                        />
+                      ))
+                    : null}
+                  {review?.state === 'use_existing' && review.existing_item_id ? (
+                    <Button
+                      label={`View existing piece for photo ${number}`}
+                      variant="secondary"
+                      onPress={() => router.push(`/wardrobe/items/${review.existing_item_id}`)}
+                    />
+                  ) : null}
+                  {awaitingParts(entry) ? (
+                    <Button label={`Choose pieces from photo ${number}`} onPress={() => router.push(`/wardrobe/split/${entry.id}`)} />
                   ) : null}
                   {task?.status === 'failed' ? (
                     <Button label={`Retry photo ${number}`} variant="secondary" onPress={() => uploadManager.retry(entry.id)} />
@@ -221,7 +273,7 @@ export default function UploadReceipt() {
                       onPress={() => retry.mutate(entry.id)}
                     />
                   ) : null}
-                  {['awaiting_upload', 'uploaded', 'validating', 'failed'].includes(entry.state) ? (
+                  {['awaiting_upload', 'uploaded', 'validating', 'failed'].includes(entry.state) || awaitingParts(entry) ? (
                     <Button
                       label={`Cancel photo ${number}`}
                       variant="quiet"

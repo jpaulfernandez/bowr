@@ -40,6 +40,11 @@ describe('displayState', () => {
     expect(displayState(item, failed, false)).toBe('needs_attention');
     expect(displayState({ ...item, display_image: 'original' }, failed, false)).toBe('ready');
   });
+  it('a part of a group photo is processing until cropped, and needs attention if the crop failed', () => {
+    expect(displayState(item, [{ stage: 'crop', state: 'queued' }], false)).toBe('processing');
+    expect(displayState(item, [{ stage: 'crop', state: 'failed' }], false)).toBe('needs_attention');
+    expect(displayState(item, [{ stage: 'crop', state: 'succeeded' }, { stage: 'cutout', state: 'succeeded' }], true)).toBe('ready');
+  });
   it('archived wins over processing', () => {
     expect(displayState({ ...item, lifecycle: 'archived' }, [{ stage: 'cutout', state: 'queued' }], false)).toBe('archived');
   });

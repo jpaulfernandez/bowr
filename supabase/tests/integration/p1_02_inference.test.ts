@@ -44,8 +44,8 @@ async function editItem(token: string, itemId: string, patch: Record<string, unk
   throw new Error('edit kept conflicting');
 }
 
-async function piece(owner: Member, bytes = fixtures.garment) {
-  const gathered = await gatherPiece(owner.token, bytes);
+async function piece(owner: Member, bytes = fixtures.garment, { exact = false } = {}) {
+  const gathered = await gatherPiece(owner.token, bytes, 'image/png', { exact });
   for (const stage of ['cutout', 'tags', 'colors', 'embedding']) await settledStage(gathered.itemId, stage);
   return gathered;
 }
@@ -162,10 +162,10 @@ function unitVector(seed: number): number[] {
 
 describe('P1.02-A2: vectors are versioned and retrieval stays within the owner', () => {
   it('embeddings are finite, normalized and versioned; nearest neighbours never cross owners or vector spaces', async () => {
-    const shirt = await piece(a);
+    const shirt = await piece(a, fixtures.garment, { exact: true });
     const trousers = await piece(a, fixtures.trousers);
     // B owns an identical photo: the closest possible vector, in another wardrobe.
-    const bShirt = await piece(b);
+    const bShirt = await piece(b, fixtures.garment, { exact: true });
 
     const [row] = await sql()`select model, model_revision, preprocess_version, media_revision,
         extensions.vector_dims(embedding) as dims

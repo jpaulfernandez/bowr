@@ -11,18 +11,21 @@ URLs are never logged.
 
 from __future__ import annotations
 
+import io
 import logging
 import threading
 from collections.abc import Callable
 from typing import Any
 
 import httpx
+from PIL import Image
 
 from . import models
 from .colors import dominant_colors
 from .cutout import cutout
 from .embedding import embed
 from .media import MediaRejected, normalize
+from .parts import PROPOSAL_MODEL, crop, propose_parts
 from .validation import validate
 
 log = logging.getLogger("bowr_worker")
@@ -155,16 +158,21 @@ def _validate_upload(job: dict[str, Any], lease: Lease, client: httpx.Client) ->
         timeout=60,
     )
     uploaded.raise_for_status()
+    output: dict[str, Any] = {
+        "width": image.width,
+        "height": image.height,
+        "byte_size": len(image.data),
+        "sha256": image.sha256,
+    }
+    if spec["purpose"] == "grouped":
+        # Suggested rectangles only; nothing becomes a piece until the member confirms.
+        with Image.open(io.BytesIO(image.data), formats=["WEBP"]) as normalized:
+            output["parts"] = propose_parts(normalized.convert("RGB"), PROPOSAL_MODEL)
     return {
         "schema_version": 1,
         "lease_generation": job["lease_generation"],
         "outcome": "ready",
-        "output": {
-            "width": image.width,
-            "height": image.height,
-            "byte_size": len(image.data),
-            "sha256": image.sha256,
-        },
+        "output": output,
     }
 
 
@@ -234,7 +242,35 @@ def _embedding_stage(job: dict[str, Any], lease: Lease, client: httpx.Client) ->
     }
 
 
-STAGES = {"cutout": _cutout_stage, "colors": _colors_stage, "embedding": _embedding_stage}
+def _crop_stage(job: dict[str, Any], lease: Lease, client: httpx.Client) -> dict[str, Any] | None:
+    spec = job["input"]
+    source = _download(client, job["sources"]["source"]["url"], spec["max_bytes"])
+    if source is None:
+        raise MediaRejected("SOURCE_MISSING")
+    part = crop(source, spec["box"])
+    if lease.lost.is_set():
+        return None
+    uploaded = client.put(
+        lease.output_url("original"),
+        content=part.data,
+        headers={"Content-Type": job["outputs"]["original"]["content_type"]},
+        timeout=60,
+    )
+    uploaded.raise_for_status()
+    return {
+        "schema_version": 1,
+        "lease_generation": job["lease_generation"],
+        "outcome": "ready",
+        "outputs": {"original": part.describe()},
+    }
+
+
+STAGES = {
+    "crop": _crop_stage,
+    "cutout": _cutout_stage,
+    "colors": _colors_stage,
+    "embedding": _embedding_stage,
+}
 
 
 def _run_ai_stage(job: dict[str, Any], lease: Lease, client: httpx.Client, internal_api: str) -> str:

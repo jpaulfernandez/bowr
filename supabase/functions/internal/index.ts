@@ -26,6 +26,8 @@ const STAGE_FAILURE_CODES = new Set(['NO_FOREGROUND', 'SOURCE_MISSING', 'CORRUPT
 
 /** Expected renditions per item stage: content type and exact or maximum edge. */
 const STAGE_OUTPUTS: Record<string, Record<string, { contentType: 'image/webp' | 'image/png'; edge?: number }>> = {
+  // One confirmed part of a grouped photo, cropped into the piece's own original.
+  crop: { original: { contentType: 'image/webp' } },
   cutout: {
     cutout: { contentType: 'image/webp', edge: 1024 },
     thumbnail: { contentType: 'image/webp', edge: 256 },
@@ -62,7 +64,7 @@ type ValidationClaimed = {
 type StageClaimed = {
   job_id: string;
   kind: 'item_stage';
-  stage: 'cutout' | 'colors' | 'embedding' | 'tags';
+  stage: 'crop' | 'cutout' | 'colors' | 'embedding' | 'tags' | 'label';
   user_id: string;
   item_id: string;
   lease_generation: number;
@@ -235,7 +237,9 @@ async function completeValidation(req: Request, requestId: string, jobId: string
       (await sha256Hex(bytes)) !== claimed.sha256 ||
       !Number.isInteger(claimed.width) || !Number.isInteger(claimed.height) ||
       (claimed.width as number) < 1 || (claimed.height as number) < 1 ||
-      Math.max(claimed.width as number, claimed.height as number) > 2048
+      Math.max(claimed.width as number, claimed.height as number) > 2048 ||
+      // Proposed parts are suggestions; the database keeps only well-formed boxes.
+      (claimed.parts !== undefined && (!Array.isArray(claimed.parts) || claimed.parts.length > 20))
     ) {
       await rpc('svc_discard_job_output', {
         p_job_id: jobId,

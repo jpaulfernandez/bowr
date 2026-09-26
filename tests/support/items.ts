@@ -4,6 +4,7 @@ import { expect } from 'vitest';
 import { api } from './api';
 import { settleItemStages } from './jobs';
 import { createSlot, putSlot } from './media';
+import { uniquePng } from './png';
 import { sql, stack } from './stack';
 
 export { wardrobeFixtures } from './media';
@@ -24,8 +25,13 @@ export async function itemForEntry(entryId: string) {
   return row ?? null;
 }
 
-/** Uploads one garment photo through the public API and waits for its item. */
-export async function gatherPiece(token: string, bytes: Buffer, contentType = 'image/png') {
+/**
+ * Uploads one garment photo through the public API and waits for its item. PNG
+ * fixtures are made distinct per call so a member's repeated fixture is a new
+ * photo, not an exact reupload held for a duplicate decision.
+ */
+export async function gatherPiece(token: string, original: Buffer, contentType = 'image/png', { exact = false } = {}) {
+  const bytes = contentType === 'image/png' && !exact ? uniquePng(original) : original;
   const { entry, batchId } = await createSlot(token, bytes, contentType);
   expect((await putSlot(entry, bytes)).status).toBe(200);
   const completed = await api(`/upload-entries/${entry.entry_id}/complete`, { token, method: 'POST', key: randomUUID() });

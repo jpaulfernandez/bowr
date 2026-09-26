@@ -26,8 +26,19 @@ export function PieceImage({
   const cutout = assetFor(item, small ? 'thumbnail' : 'cutout');
   const original = assetFor(item, 'original');
   const pending = stageFor(item, 'cutout');
+  const crop = stageFor(item, 'crop');
   const box = { width: size, height: size };
 
+  // A part of a group photo has no image of its own until it is cropped.
+  if (!original && crop && ['queued', 'running', 'retry_wait'].includes(crop.state)) {
+    return (
+      <View style={box} className="items-center justify-center rounded-image bg-surface-subtle p-2">
+        <Text variant="secondary" className="text-center">
+          Preparing photo
+        </Text>
+      </View>
+    );
+  }
   if (choice === 'cutout' && cutout) {
     return <PrivateImage assetId={cutout.asset_id} variant={small ? 'thumbnail' : 'cutout'} label={label} size={size} />;
   }

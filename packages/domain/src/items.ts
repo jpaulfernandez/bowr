@@ -51,9 +51,10 @@ export type DisplayState = 'archived' | 'processing' | 'needs_attention' | 'read
 export type StageFacts = { stage: string; state: StageState };
 
 /**
- * Processing: the cutout is still being made and the piece has no usable image
- * choice yet. Needs attention: category unresolved, or the cutout failed while
- * the original has not been chosen. Otherwise ready.
+ * Processing: a group photo's part is still being cropped, or the cutout is
+ * still being made and the piece has no usable image choice yet. Needs
+ * attention: the crop failed, the category is unresolved, or the cutout failed
+ * while the original has not been chosen. Otherwise ready.
  */
 export function displayState(
   item: Pick<ItemFacts, 'lifecycle' | 'category' | 'category_review_required'> & { display_image: 'cutout' | 'original' },
@@ -61,6 +62,10 @@ export function displayState(
   hasCutout: boolean,
 ): DisplayState {
   if (item.lifecycle === 'archived') return 'archived';
+  // A part of a group photo is processing until it has its own cropped image.
+  const crop = stages.find((s) => s.stage === 'crop');
+  if (crop && ['queued', 'running', 'retry_wait'].includes(crop.state)) return 'processing';
+  if (crop && (crop.state === 'failed' || crop.state === 'canceled')) return 'needs_attention';
   const cutout = stages.find((s) => s.stage === 'cutout');
   const cutoutPending = cutout && ['queued', 'running', 'retry_wait'].includes(cutout.state);
   if (cutoutPending && !hasCutout && item.display_image === 'cutout') return 'processing';

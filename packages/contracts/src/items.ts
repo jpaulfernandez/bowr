@@ -18,7 +18,7 @@ export const FieldMeta = z.record(
   }),
 );
 
-export const StageName = z.enum(['cutout', 'colors', 'embedding', 'tags', 'label']);
+export const StageName = z.enum(['crop', 'cutout', 'colors', 'embedding', 'tags', 'label']);
 export const StageState = z.enum(['queued', 'running', 'retry_wait', 'blocked_budget', 'succeeded', 'failed', 'canceled']);
 
 export const ItemStage = z.object({
@@ -94,3 +94,19 @@ export type ItemPatch = z.infer<typeof ItemPatch>;
 
 /** update_item result (no attachments). */
 export const UpdatedItem = Item.omit({ item_assets: true, item_stages: true, created_at: true });
+
+/**
+ * A possible duplicate for the member to decide (DESIGN 6.4). An exact reupload is held
+ * before a piece is created (entry_id); a near match flags a new piece (item_id).
+ */
+export const DuplicateReview = z.object({
+  id: z.string().uuid(),
+  entry_id: z.string().uuid().nullable(),
+  item_id: z.string().uuid().nullable(),
+  existing_item_id: z.string().uuid().nullable(),
+  basis: z.enum(['hash', 'vector']),
+  state: z.enum(['pending', 'use_existing', 'add_another']),
+  created_at: z.string(),
+});
+export type DuplicateReview = z.infer<typeof DuplicateReview>;
+export const DUPLICATE_REVIEW_SELECT = 'id, entry_id, item_id, existing_item_id, basis, state, created_at';

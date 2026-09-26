@@ -24,7 +24,7 @@ export const WorkerWake = z
 export const ValidationInput = z
   .object({
     declared_content_type: z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']),
-    purpose: z.enum(['garment', 'care_label']),
+    purpose: z.enum(['garment', 'care_label', 'grouped']),
     rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]),
     max_bytes: z.number().int().positive(),
     max_pixels: z.number().int().positive(),
@@ -64,6 +64,29 @@ const stageClaimBase = {
   lease_expires_at: z.string(),
   capability: z.string().min(20).max(2000),
 };
+
+/** A normalized rectangle in the sanitized, already-oriented original. */
+export const PartBox = z
+  .object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), w: z.number().gt(0).max(1), h: z.number().gt(0).max(1) })
+  .strict();
+export const MAX_PARTS_PER_PHOTO = 20;
+
+/** One confirmed part of a grouped photo becomes the piece's own original. */
+export const CropClaim = z
+  .object({
+    ...stageClaimBase,
+    stage: z.literal('crop'),
+    input: z
+      .object({
+        box: PartBox,
+        source: z.object({ width: z.number().int().positive(), height: z.number().int().positive() }).strict(),
+        max_bytes: z.number().int().positive(),
+      })
+      .strict(),
+    sources: z.object({ source: signedSource }).strict(),
+    outputs: z.object({ original: signed('image/webp') }).strict(),
+  })
+  .strict();
 
 /** An item stage computes renditions or results for one item media revision. */
 export const CutoutClaim = z
@@ -126,7 +149,7 @@ export const TagsClaim = z
   })
   .strict();
 
-export const WorkerClaimResponse = z.union([ValidationClaim, CutoutClaim, ColorsClaim, EmbeddingClaim, TagsClaim]);
+export const WorkerClaimResponse = z.union([ValidationClaim, CropClaim, CutoutClaim, ColorsClaim, EmbeddingClaim, TagsClaim]);
 
 const rendition = (maxEdge: number) =>
   z
@@ -152,6 +175,13 @@ export const DominantColor = z
   .strict();
 
 export const ItemStageCompleteRequest = z.union([
+  z
+    .object({
+      ...stageComplete,
+      outcome: z.literal('ready'),
+      outputs: z.object({ original: rendition(2048) }).strict(),
+    })
+    .strict(),
   z
     .object({
       ...stageComplete,
@@ -208,6 +238,8 @@ export const WorkerCompleteRequest = z.discriminatedUnion('outcome', [
           height: z.number().int().positive().max(2048),
           byte_size: z.number().int().positive(),
           sha256: z.string().regex(/^[0-9a-f]{64}$/),
+          // Grouped photos only: suggested parts for the member to confirm.
+          parts: z.array(PartBox).max(MAX_PARTS_PER_PHOTO).optional(),
         })
         .strict(),
     })

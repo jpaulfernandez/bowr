@@ -77,9 +77,18 @@ export async function temporaryCleanup() {
     p_limit: 200,
   });
   if (labelError) throw new Error(`label cleanup failed: ${labelError.code}`);
+  // Grouped photos are never kept: unconfirmed ones expire, confirmed ones once cropped.
+  const { data: groups, error: groupError } = await serviceClient().rpc('svc_expire_group_sources', { p_limit: 200 });
+  if (groupError) throw new Error(`group cleanup failed: ${groupError.code}`);
   const media = await processMediaDeletion();
   const summary = data as { uploads_expired: number; records_purged: number };
-  return { ...summary, labels_expired: labels as number, objects_deleted: media.deleted, objects_failed: media.failed };
+  return {
+    ...summary,
+    labels_expired: labels as number,
+    groups_expired: groups as number,
+    objects_deleted: media.deleted,
+    objects_failed: media.failed,
+  };
 }
 
 // Newer keys may be worker output whose completion has not been recorded yet.

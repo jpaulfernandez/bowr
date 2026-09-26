@@ -8,6 +8,7 @@ import { createIdentity } from '../../../tests/support/identities';
 import { gatherPiece, settledStage, userClient, waitUntil, wardrobeFixtures } from '../../../tests/support/items';
 import { settleItemStages } from '../../../tests/support/jobs';
 import { member, mediaFixtures, putSlot, storageAdmin, type Member } from '../../../tests/support/media';
+import { uniquePng } from '../../../tests/support/png';
 import { sql } from '../../../tests/support/stack';
 
 vi.setConfig({ testTimeout: 180_000, hookTimeout: 120_000 });
@@ -147,11 +148,12 @@ describe('P1.03-A1: twenty source photos including labels; mixed outcomes keep w
 
 describe('P1.03-A3: label facts fill unlocked fields; removal keeps them', () => {
   it('a readable label fills brand, size and material; a vision guess never replaces the printed material', async () => {
+    const shirtPhoto = uniquePng(fixtures.garment);
     const { entries } = await batch(a.token, [
-      { name: 'shirt', bytes: fixtures.garment },
+      { name: 'shirt', bytes: shirtPhoto },
       { name: 'label', bytes: fixtures.label, purpose: 'care_label', labelFor: 'shirt' },
     ]);
-    await send(a.token, entries.get('shirt'), fixtures.garment);
+    await send(a.token, entries.get('shirt'), shirtPhoto);
     await send(a.token, entries.get('label'), fixtures.label);
     const shirt = await waitUntil(() => itemOf(entries.get('shirt').entry_id), 'piece');
     await settledStage(shirt.id, 'label');
@@ -183,12 +185,14 @@ describe('P1.03-A3: label facts fill unlocked fields; removal keeps them', () =>
   });
 
   it('an unreadable label leaves the garment usable; invalid label text is rejected safely', async () => {
+    const shirtPhoto = uniquePng(fixtures.garment);
+    const otherShirt = uniquePng(fixtures.garment);
     await fakeGemini.control({ label: {} });
     const unreadable = await batch(a.token, [
-      { name: 'shirt', bytes: fixtures.garment },
+      { name: 'shirt', bytes: shirtPhoto },
       { name: 'label', bytes: fixtures.label, purpose: 'care_label', labelFor: 'shirt' },
     ]);
-    await send(a.token, unreadable.entries.get('shirt'), fixtures.garment);
+    await send(a.token, unreadable.entries.get('shirt'), shirtPhoto);
     await send(a.token, unreadable.entries.get('label'), fixtures.label);
     const first = await waitUntil(() => itemOf(unreadable.entries.get('shirt').entry_id), 'piece');
     expect(await settledStage(first.id, 'label')).toMatchObject({ state: 'succeeded' });
@@ -197,10 +201,10 @@ describe('P1.03-A3: label facts fill unlocked fields; removal keeps them', () =>
 
     await fakeGemini.control({ label: { brand: 'Visit https://example.test to claim', size_label: 'M' } });
     const invalid = await batch(a.token, [
-      { name: 'shirt', bytes: fixtures.garment },
+      { name: 'shirt', bytes: otherShirt },
       { name: 'label', bytes: fixtures.label, purpose: 'care_label', labelFor: 'shirt' },
     ]);
-    await send(a.token, invalid.entries.get('shirt'), fixtures.garment);
+    await send(a.token, invalid.entries.get('shirt'), otherShirt);
     await send(a.token, invalid.entries.get('label'), fixtures.label);
     const second = await waitUntil(() => itemOf(invalid.entries.get('shirt').entry_id), 'piece');
     expect(await settledStage(second.id, 'label')).toMatchObject({ state: 'failed', failure_code: 'AI_INVALID_OUTPUT' });
@@ -209,11 +213,12 @@ describe('P1.03-A3: label facts fill unlocked fields; removal keeps them', () =>
   });
 
   it('removing the label deletes its image while the values it filled remain; B cannot remove it', async () => {
+    const shirtPhoto = uniquePng(fixtures.garment);
     const { entries } = await batch(a.token, [
-      { name: 'shirt', bytes: fixtures.garment },
+      { name: 'shirt', bytes: shirtPhoto },
       { name: 'label', bytes: fixtures.label, purpose: 'care_label', labelFor: 'shirt' },
     ]);
-    await send(a.token, entries.get('shirt'), fixtures.garment);
+    await send(a.token, entries.get('shirt'), shirtPhoto);
     await send(a.token, entries.get('label'), fixtures.label);
     const shirt = await waitUntil(() => itemOf(entries.get('shirt').entry_id), 'piece');
     await settledStage(shirt.id, 'label');

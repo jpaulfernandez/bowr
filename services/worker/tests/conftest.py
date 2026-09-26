@@ -106,6 +106,33 @@ def trousers(width: int = 800, height: int = 600) -> Image.Image:
     return image
 
 
+def accessories(width: int = 800, height: int = 600) -> Image.Image:
+    """A gold watch and a silver bracelet, well apart, on dark fabric (a grouped photo)."""
+    from PIL import ImageDraw
+
+    image = Image.new("RGB", (width, height), (38, 36, 40))
+    draw = ImageDraw.Draw(image)
+    sx, sy = width / 800, height / 600
+    draw.rectangle((150 * sx, 120 * sy, 200 * sx, 480 * sy), fill=(120, 84, 40))
+    draw.ellipse((115 * sx, 245 * sy, 235 * sx, 355 * sy), fill=(214, 178, 92))
+    draw.ellipse((470 * sx, 190 * sy, 690 * sx, 410 * sy), outline=(205, 205, 210), width=round(24 * sx))
+    return image
+
+
+def earrings(width: int = 800, height: int = 600) -> Image.Image:
+    """A pair of gold hoop earrings on dark fabric: sold and worn as one set."""
+    from PIL import ImageDraw
+
+    image = Image.new("RGB", (width, height), (38, 36, 40))
+    draw = ImageDraw.Draw(image)
+    sx, sy = width / 800, height / 600
+    for cx in (320, 480):
+        draw.ellipse(
+            ((cx - 50) * sx, 250 * sy, (cx + 50) * sx, 350 * sy), outline=(214, 178, 92), width=round(14 * sx)
+        )
+    return image
+
+
 def care_label(width: int = 600, height: int = 400) -> Image.Image:
     """A white care label with dark printed lines (no real text or brand)."""
     from PIL import ImageDraw

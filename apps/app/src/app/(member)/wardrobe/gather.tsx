@@ -16,7 +16,7 @@ import { useBootstrap } from '../../../lib/bootstrap';
 import { ApiError } from '../../../lib/errors';
 import { pickImages, type PickedImage } from '../../../platform/image-picker';
 
-type Kind = 'garment' | 'label';
+type Kind = 'garment' | 'group' | 'label';
 type Selected = PickedImage & {
   id: string;
   problem: string | null;
@@ -114,7 +114,7 @@ export default function Gather() {
     mutationFn: async () => {
       const files = usable.map((s) => ({
         client_file_id: s.id,
-        purpose: s.kind === 'label' ? 'care_label' : 'garment',
+        purpose: s.kind === 'label' ? 'care_label' : s.kind === 'group' ? 'grouped' : 'garment',
         content_type: s.type,
         byte_size: s.size,
         rotation: s.rotation,
@@ -182,6 +182,7 @@ export default function Gather() {
             <Text>One piece per photo, on a hanger or laid flat, against a plain background that contrasts with it.</Text>
             <Text>Use daylight near a window, no flash. Hold the phone straight on and level, with a little space around the piece.</Text>
             <Text>Shoes: the pair side by side, from the side. Shades: arms open, lens height, avoid glare.</Text>
+            <Text>Jewelry and watches: several small pieces can share one photo on dark fabric. Mark it as several small pieces.</Text>
             <Text>A care label is optional: add its photo and choose the piece it belongs to. It counts toward the 20 photos.</Text>
           </View>
         ) : null}
@@ -223,14 +224,20 @@ export default function Gather() {
                       value={item.kind}
                       options={[
                         { value: 'garment', label: 'A piece' },
+                        { value: 'group', label: 'Several small pieces' },
                         { value: 'label', label: 'A care label' },
                       ]}
                       onChange={(kind) => {
                         update(item.id, { kind, labelFor: null });
-                        // A garment turned into a label can no longer hold labels.
-                        if (kind === 'label') setSelected((current) => current.map((s) => (s.labelFor === item.id ? { ...s, labelFor: null } : s)));
+                        // Only a single-piece photo can hold care labels.
+                        if (kind !== 'garment') setSelected((current) => current.map((s) => (s.labelFor === item.id ? { ...s, labelFor: null } : s)));
                       }}
                     />
+                  ) : null}
+                  {!item.problem && item.kind === 'group' ? (
+                    <Text variant="secondary">
+                      After upload you choose: keep it as one set, or mark each piece. No piece is added until you choose.
+                    </Text>
                   ) : null}
                   {!item.problem && !targetId && item.kind === 'label' ? (
                     otherGarments.length > 0 ? (

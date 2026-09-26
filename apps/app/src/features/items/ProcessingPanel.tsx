@@ -15,17 +15,28 @@ import { useSession } from '../../lib/session';
 import { supabase } from '../../lib/supabase';
 import { itemKeys, stageFor, useRetryStage, useUpdateItem } from './queries';
 
-const STAGE_LABEL = { tags: 'Tags', colors: 'Colors', embedding: 'Matching' } as const;
+const STAGE_LABEL = { crop: 'Photo', tags: 'Tags', colors: 'Colors', embedding: 'Matching' } as const;
 type Stage = keyof typeof STAGE_LABEL;
 
 function stageText(stage: Stage, state: string, code: string | null, resetsAt: string | null): string | null {
   if (['queued', 'running', 'retry_wait'].includes(state)) {
-    return stage === 'tags' ? 'Suggesting tags.' : stage === 'colors' ? 'Measuring colors.' : 'Preparing matching.';
+    return stage === 'crop'
+      ? 'Cutting this piece out of its group photo.'
+      : stage === 'tags'
+        ? 'Suggesting tags.'
+        : stage === 'colors'
+          ? 'Measuring colors.'
+          : 'Preparing matching.';
   }
   if (state === 'blocked_budget') {
     return `Tag suggestions wait for the monthly AI allowance${resetsAt ? `, which resets ${formatDateTime(resetsAt)}` : ''}. You can set details yourself meanwhile.`;
   }
   if (state === 'failed' || state === 'canceled') {
+    if (stage === 'crop') {
+      return code === 'SOURCE_MISSING'
+        ? 'Its group photo is no longer available. Upload a photo of this piece instead.'
+        : "This piece couldn't be cut out of its group photo.";
+    }
     if (stage === 'tags') {
       if (code === 'AI_INVALID_OUTPUT') return "Tag suggestions couldn't be used. Your details are unchanged.";
       if (code === 'AI_UNCERTAIN') return "bowr couldn't confirm the last tag request; it may still count toward the AI allowance.";

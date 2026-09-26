@@ -21,7 +21,7 @@ export const itemKeys = {
 export const assetFor = (item: Item, role: 'original' | 'cutout' | 'thumbnail' | 'mask') =>
   item.item_assets.find((a) => a.role === role && a.detached_at === null) ?? null;
 
-export const stageFor = (item: Item, stage: 'cutout' | 'colors' | 'embedding' | 'tags') => item.item_stages.find((s) => s.stage === stage) ?? null;
+export const stageFor = (item: Item, stage: 'crop' | 'cutout' | 'colors' | 'embedding' | 'tags') => item.item_stages.find((s) => s.stage === stage) ?? null;
 
 export function itemState(item: Item): DisplayState {
   return displayState(item, item.item_stages, assetFor(item, 'cutout') !== null);
@@ -116,7 +116,7 @@ export function useRetryStage(item: Item | null | undefined) {
   const { userId } = useSession();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (stage: 'cutout' | 'colors' | 'embedding' | 'tags') =>
+    mutationFn: (stage: 'crop' | 'cutout' | 'colors' | 'embedding' | 'tags') =>
       apiRequest(`/items/${item!.id}/process`, {
         method: 'POST',
         idempotencyKey: crypto.randomUUID(),

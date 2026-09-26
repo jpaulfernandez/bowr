@@ -3,7 +3,7 @@ import { aiEnabled, runDiagnostic } from '../_shared/ai-gateway.ts';
 import { requireCaller } from '../_shared/auth.ts';
 import { appError, errorResponse, fromDatabaseError, json, preflight } from '../_shared/http.ts';
 import { sha256Hex } from '../_shared/capability.ts';
-import { afterResponse, dispatchJob } from '../_shared/dispatch.ts';
+import { afterResponse, dispatchJob, dispatchRunnable } from '../_shared/dispatch.ts';
 import { processAccountDeletions, processMediaDeletion } from '../_shared/lifecycle.ts';
 import { clientIpHash, generateInviteCode, inviteDigest } from '../_shared/invite-codes.ts';
 import { serviceClient } from '../_shared/service.ts';
@@ -203,9 +203,45 @@ route('GET', /^\/v1\/upload-entries\/([^/]+)\/status$/, async ({ req, requestId,
   );
 });
 
+// Keep a grouped photo as one set, or confirm the parts to become pieces.
+route('POST', /^\/v1\/upload-entries\/([^/]+)\/confirm-parts$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  const key = idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  const body = await jsonBody(req, ['mode', 'image', 'parts']);
+  const result = (await callService('svc_confirm_parts', {
+    p_user_id: userId,
+    p_request_id: key,
+    p_entry_id: params[0],
+    p_mode: body.mode ?? null,
+    p_image: body.image ?? null,
+    p_parts: body.parts ?? null,
+  })) as { items: Array<{ job_id: string }> };
+  for (const item of result.items) afterResponse(dispatchJob(item.job_id));
+  return json(req, requestId, 200, result);
+});
+
+// Use existing / Add another for a possible duplicate. Decide later needs no call.
+route('POST', /^\/v1\/duplicate-reviews\/([^/]+)\/resolve$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  const key = idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  const body = await jsonBody(req, ['decision']);
+  const result = await callService('svc_resolve_duplicate', {
+    p_user_id: userId,
+    p_request_id: key,
+    p_review_id: params[0],
+    p_decision: body.decision ?? null,
+  });
+  // A new piece or a moved label queues stages; removed media is deleted.
+  afterResponse(dispatchRunnable(5));
+  afterResponse(processMediaDeletion());
+  return json(req, requestId, 200, result);
+});
+
 // --- Items -------------------------------------------------------------------
 
-const ITEM_STAGES = ['cutout', 'colors', 'embedding', 'tags', 'label'];
+const ITEM_STAGES = ['crop', 'cutout', 'colors', 'embedding', 'tags', 'label'];
 
 // Owner retries a failed or interrupted stage for the item's current media revision.
 route('POST', /^\/v1\/items\/([^/]+)\/process$/, async ({ req, requestId, params }) => {
