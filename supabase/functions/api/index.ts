@@ -7,7 +7,8 @@ import { afterResponse, dispatchJob, dispatchRunnable } from '../_shared/dispatc
 import { processAccountDeletions, processMediaDeletion } from '../_shared/lifecycle.ts';
 import { clientIpHash, generateInviteCode, inviteDigest } from '../_shared/invite-codes.ts';
 import { serviceClient } from '../_shared/service.ts';
-import { bucketName, headObject, presignGet, presignPut } from '../_shared/storage.ts';
+import { imageInfo } from '../_shared/image-bytes.ts';
+import { bucketName, deleteObject, headObject, presignGet, presignPut, putObject } from '../_shared/storage.ts';
 import { idempotencyKey, isUuid, jsonBody } from '../_shared/validate.ts';
 
 type Context = { req: Request; requestId: string; params: string[] };
@@ -258,6 +259,65 @@ route('POST', /^\/v1\/items\/([^/]+)\/process$/, async ({ req, requestId, params
     p_item_id: params[0],
     p_stage: body.stage,
     p_media_revision: body.media_revision,
+  })) as { job_id: string };
+  afterResponse(dispatchJob(result.job_id));
+  return json(req, requestId, 202, { ...result, poll_after_ms: 2000 });
+});
+
+// A member-edited mask (P1.05): a PNG exactly the size of the piece's original.
+// Only the mask is accepted; the cutout is composed on the server from the
+// stored original, so no client-made cutout is ever published.
+const MAX_MASK_BYTES = 4 * 1024 * 1024;
+route('POST', /^\/v1\/items\/([^/]+)\/mask$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  const key = idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  const revision = Number(new URL(req.url).searchParams.get('media_revision'));
+  if (!Number.isSafeInteger(revision)) throw appError(422, 'VALIDATION_FAILED', { field: 'media_revision' });
+  if (req.headers.get('Content-Type') !== 'image/png') throw appError(422, 'MASK_REJECTED');
+  const bytes = new Uint8Array(await req.arrayBuffer());
+  const info = imageInfo(bytes);
+  if (bytes.byteLength < 1 || bytes.byteLength > MAX_MASK_BYTES || info?.contentType !== 'image/png') {
+    throw appError(422, 'MASK_REJECTED');
+  }
+  const objectKey = `users/${userId}/items/${params[0]}/edits/${crypto.randomUUID()}.png`;
+  await putObject(objectKey, bytes, 'image/png');
+  let result: { job_id: string };
+  try {
+    result = (await callService('svc_submit_mask', {
+      p_user_id: userId,
+      p_request_id: key,
+      p_item_id: params[0],
+      p_media_revision: revision,
+      p_bucket: bucketName(),
+      p_object_key: objectKey,
+      p_width: info.width,
+      p_height: info.height,
+      p_byte_size: bytes.byteLength,
+      p_sha256: await sha256Hex(bytes),
+    })) as { job_id: string };
+  } catch (error) {
+    // Nothing recorded it; an interrupted delete is caught by reconciliation.
+    afterResponse(deleteObject(objectKey));
+    throw error;
+  }
+  afterResponse(dispatchJob(result.job_id));
+  return json(req, requestId, 202, { ...result, poll_after_ms: 2000 });
+});
+
+// An explicit cutout with another pinned model; bounded and never automatic.
+route('POST', /^\/v1\/items\/([^/]+)\/recut$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  const key = idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  const body = await jsonBody(req, ['media_revision', 'model']);
+  if (!Number.isSafeInteger(body.media_revision)) throw appError(422, 'VALIDATION_FAILED', { field: 'media_revision' });
+  const result = (await callService('svc_recut_item', {
+    p_user_id: userId,
+    p_request_id: key,
+    p_item_id: params[0],
+    p_media_revision: body.media_revision,
+    p_model: typeof body.model === 'string' ? body.model : null,
   })) as { job_id: string };
   afterResponse(dispatchJob(result.job_id));
   return json(req, requestId, 202, { ...result, poll_after_ms: 2000 });

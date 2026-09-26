@@ -82,6 +82,17 @@ export async function getObject(key: string, maxBytes: number): Promise<Uint8Arr
   return bytes;
 }
 
+/** Writes one server-verified object under a server-chosen key. */
+export async function putObject(key: string, bytes: Uint8Array<ArrayBuffer>, contentType: string): Promise<void> {
+  const { client, internalEndpoint } = storage();
+  const response = await client.fetch(objectUrl(internalEndpoint, key), {
+    method: 'PUT',
+    body: bytes,
+    headers: { 'content-type': contentType },
+  });
+  if (!response.ok) throw new Error(`storage PUT ${response.status}`);
+}
+
 /** Idempotent delete followed by an existence check. */
 export async function deleteObject(key: string): Promise<boolean> {
   const { client, internalEndpoint } = storage();

@@ -9,6 +9,7 @@ import httpx
 import pytest
 
 from bowr_worker.pipeline import run_job
+from bowr_worker.validation import ContractViolation, validate
 
 from .conftest import encode, two_tone
 
@@ -172,3 +173,23 @@ def test_a_storage_failure_is_reported_as_transient() -> None:
         "failure_code": "TRANSIENT_STORAGE",
     }
     assert not any(call.url.path.endswith("/complete") for call in calls)
+
+
+def test_a_contract_violation_never_carries_signed_urls_or_capabilities() -> None:
+    signed_url = "http://store.test/source?X-Amz-Signature=very-secret-signature"
+    claim = {
+        "schema_version": 1,
+        "job_id": "11111111-2222-4333-8444-555555555555",
+        "kind": "validate_upload",
+        "lease_generation": 1,
+        "lease_expires_at": "2026-09-26T10:00:00Z",
+        "capability": "capability-token-that-must-not-be-logged",
+        "input": {"purpose": "not-a-purpose"},
+        "source": {"url": signed_url},
+        "output": {"url": signed_url, "content_type": "image/webp"},
+    }
+    with pytest.raises(ContractViolation) as raised:
+        validate("worker_claim_response", claim)
+    text = str(raised.value)
+    assert text.startswith("worker_claim_response")
+    assert "very-secret-signature" not in text and "capability-token" not in text

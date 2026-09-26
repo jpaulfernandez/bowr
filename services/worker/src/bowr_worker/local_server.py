@@ -16,7 +16,6 @@ from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import httpx
-from jsonschema import ValidationError
 
 from .pipeline import run_job
 from .validation import validate
@@ -63,7 +62,7 @@ class WakeHandler(BaseHTTPRequestHandler):
         try:
             wake = json.loads(self.rfile.read(min(length, 4096)))
             validate("worker_wake", wake)
-        except (ValueError, ValidationError):
+        except ValueError:
             self.send_response(422)
             self.end_headers()
             return

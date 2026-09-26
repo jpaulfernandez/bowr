@@ -20,6 +20,7 @@ export const routeTemplates = [
   '/wardrobe/uploads/:id',
   '/wardrobe/split/:id',
   '/wardrobe/items/:id',
+  '/wardrobe/edges/:id',
   '/help/photos',
   '/more',
   '/admin',
@@ -35,6 +36,7 @@ export function routeTemplate(pathname: string): RouteTemplate {
   if (/^\/wardrobe\/uploads\/[^/]+$/.test(path)) return '/wardrobe/uploads/:id';
   if (/^\/wardrobe\/split\/[^/]+$/.test(path)) return '/wardrobe/split/:id';
   if (/^\/wardrobe\/items\/[^/]+$/.test(path)) return '/wardrobe/items/:id';
+  if (/^\/wardrobe\/edges\/[^/]+$/.test(path)) return '/wardrobe/edges/:id';
   return (routeTemplates as readonly string[]).includes(path) ? (path as RouteTemplate) : '/other';
 }
 

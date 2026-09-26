@@ -80,12 +80,16 @@ export async function temporaryCleanup() {
   // Grouped photos are never kept: unconfirmed ones expire, confirmed ones once cropped.
   const { data: groups, error: groupError } = await serviceClient().rpc('svc_expire_group_sources', { p_limit: 200 });
   if (groupError) throw new Error(`group cleanup failed: ${groupError.code}`);
+  // Edited masks are inputs only; any the cutout never used are not kept.
+  const { data: edits, error: editError } = await serviceClient().rpc('svc_expire_mask_inputs', { p_limit: 200 });
+  if (editError) throw new Error(`mask cleanup failed: ${editError.code}`);
   const media = await processMediaDeletion();
   const summary = data as { uploads_expired: number; records_purged: number };
   return {
     ...summary,
     labels_expired: labels as number,
     groups_expired: groups as number,
+    edits_expired: edits as number,
     objects_deleted: media.deleted,
     objects_failed: media.failed,
   };

@@ -1,6 +1,8 @@
 import { categoryLabel, displayName, needsCategory } from '@bowr/domain';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
+import { z } from 'zod';
 import { Text as RNText, useWindowDimensions, View } from 'react-native';
 import { Banner } from '../../../../components/Banner';
 import { Button } from '../../../../components/Button';
@@ -13,7 +15,10 @@ import { PieceEditor } from '../../../../features/items/PieceEditor';
 import { PieceImage } from '../../../../features/items/PieceImage';
 import { ProcessingPanel } from '../../../../features/items/ProcessingPanel';
 import { assetFor, stageFor, useItem, useRetryStage, useUpdateItem } from '../../../../features/items/queries';
+import { apiRequest } from '../../../../lib/api';
 import { ApiError } from '../../../../lib/errors';
+import { userKeys } from '../../../../lib/query-keys';
+import { useSession } from '../../../../lib/session';
 
 const cutoutFailures: Record<string, string> = {
   NO_FOREGROUND: "bowr couldn't find a single piece against the background.",
@@ -31,7 +36,27 @@ export default function PieceDetail() {
   const [view, setView] = useState<'cutout' | 'original' | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const { width } = useWindowDimensions();
-  const reviews = useDuplicateReviews('item_id', typeof id === 'string' ? [id] : []);
+  const { userId } = useSession();
+  const queryClient = useQueryClient();
+  // An explicit cutout with the other pinned model; the server bounds how often.
+  const recut = useMutation({
+    mutationFn: ({ model, revision }: { model: string; revision: number }) =>
+      apiRequest(`/items/${id}/recut`, {
+        method: 'POST',
+        idempotencyKey: crypto.randomUUID(),
+        body: { media_revision: revision, model },
+        schema: z.unknown(),
+      }),
+    onSuccess: () => {
+      if (userId) void queryClient.invalidateQueries({ queryKey: userKeys.all(userId) });
+    },
+    onError: (error) => setNotice(error instanceof ApiError ? error.message : "The new cutout didn't start. Try again."),
+  });
+  const reviews = useDuplicateReviews(
+    'item_id',
+    typeof id === 'string' ? [id] : [],
+    item.data?.item_stages.map((s) => `${s.stage}:${s.state}`).join(',') ?? '',
+  );
   const review = reviews.data?.find((r) => r.state === 'pending') ?? null;
 
   if (item.isPending) return <Screen title="Piece" />;
@@ -130,6 +155,28 @@ export default function PieceDetail() {
               <Button label="Use cutout" variant="secondary" busy={update.isPending} onPress={() => setDisplay('cutout')} />
             </View>
           ) : null}
+          <View className="gap-3">
+            <Heading level={2}>Photo</Heading>
+            <View className="flex-row flex-wrap gap-2">
+              <Button label="Fix edges" variant="secondary" onPress={() => router.push(`/wardrobe/edges/${piece.id}`)} />
+              {stage && !['queued', 'running', 'retry_wait'].includes(stage.state) ? (
+                <Button
+                  label="Try the other cutout model"
+                  variant="secondary"
+                  busy={recut.isPending}
+                  busyLabel="Starting a new cutout"
+                  onPress={() =>
+                    recut.mutate({ model: stage.model === 'u2netp' ? 'isnet_general_use' : 'u2netp', revision: piece.media_revision })
+                  }
+                />
+              ) : null}
+              {cutout && piece.display_image === 'cutout' ? (
+                <Button label="Use original" variant="secondary" busy={update.isPending} onPress={() => setDisplay('original')} />
+              ) : null}
+              <Button label="Replace photo" variant="secondary" onPress={() => router.push(`/wardrobe/gather?replace=${piece.id}`)} />
+            </View>
+            <Text variant="secondary">Your original photo is kept. A new cutout or photo replaces the current one only once it is ready.</Text>
+          </View>
           {needsCategory(piece) ? (
             <Banner tone="warning" message="Check category: choose one so this piece can be suggested in outfits. You can still find and use it." />
           ) : null}

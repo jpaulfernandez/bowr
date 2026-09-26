@@ -48,7 +48,8 @@
               "enum": [
                 "garment",
                 "care_label",
-                "grouped"
+                "grouped",
+                "replacement"
               ]
             },
             "rotation": {
@@ -351,10 +352,18 @@
           "type": "object",
           "properties": {
             "model": {
-              "type": "string",
-              "enum": [
-                "isnet_general_use",
-                "u2netp"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "isnet_general_use",
+                    "u2netp"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "const": "manual"
+                }
               ]
             },
             "original": {
@@ -394,6 +403,19 @@
           "type": "object",
           "properties": {
             "original": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              },
+              "required": [
+                "url"
+              ],
+              "additionalProperties": false
+            },
+            "mask": {
               "type": "object",
               "properties": {
                 "url": {

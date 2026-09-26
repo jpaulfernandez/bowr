@@ -92,9 +92,9 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P1.05-T1** Build web mask-editor adapter with Restore/Erase, brush size, zoom, undo/reset and explicit accessible alternatives. Keep Use original and alternate-model retry available when brushing is impractical.
-- [ ] **P1.05-T2** Submit mask assets tied to original/media revision; validate dimensions and compose server-side. Increment media revision for accepted mask/crop/replacement and recompute affected thumbnails/colors/embeddings.
-- [ ] **P1.05-T3** Implement replace/reshoot on the existing item ID, with safe pending publication and cleanup of superseded unreferenced assets. Preserve user metadata and source/history relationships.
+- [x] **P1.05-T1** Build web mask-editor adapter with Restore/Erase, brush size, zoom, undo/reset and explicit accessible alternatives. Keep Use original and alternate-model retry available when brushing is impractical.
+- [x] **P1.05-T2** Submit mask assets tied to original/media revision; validate dimensions and compose server-side. Increment media revision for accepted mask/crop/replacement and recompute affected thumbnails/colors/embeddings.
+- [x] **P1.05-T3** Implement replace/reshoot on the existing item ID, with safe pending publication and cleanup of superseded unreferenced assets. Preserve user metadata and source/history relationships.
 
 Acceptance:
 

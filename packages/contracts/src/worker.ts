@@ -24,7 +24,7 @@ export const WorkerWake = z
 export const ValidationInput = z
   .object({
     declared_content_type: z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']),
-    purpose: z.enum(['garment', 'care_label', 'grouped']),
+    purpose: z.enum(['garment', 'care_label', 'grouped', 'replacement']),
     rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]),
     max_bytes: z.number().int().positive(),
     max_pixels: z.number().int().positive(),
@@ -95,12 +95,13 @@ export const CutoutClaim = z
     stage: z.literal('cutout'),
     input: z
       .object({
-        model: z.enum(cutoutModels),
+        // 'manual': compose from the member's edited mask instead of running a model.
+        model: z.union([z.enum(cutoutModels), z.literal('manual')]),
         original: z.object({ width: z.number().int().positive(), height: z.number().int().positive() }).strict(),
         max_bytes: z.number().int().positive(),
       })
       .strict(),
-    sources: z.object({ original: signedSource }).strict(),
+    sources: z.object({ original: signedSource, mask: signedSource.optional() }).strict(),
     outputs: cutoutOutputs,
   })
   .strict();

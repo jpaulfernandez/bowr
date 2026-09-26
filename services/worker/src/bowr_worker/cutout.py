@@ -127,13 +127,36 @@ def render(original: Image.Image, mask: np.ndarray) -> CutoutResult:
     )
 
 
-def cutout(original_bytes: bytes, model: str) -> CutoutResult:
-    """Runs a pinned model on a sanitized original and renders the results."""
+def _open_original(original_bytes: bytes) -> Image.Image:
     try:
         with Image.open(io.BytesIO(original_bytes), formats=["WEBP"]) as image:
             image.load()
-            original = image.convert("RGB")
+            return image.convert("RGB")
     except (OSError, SyntaxError, ValueError) as error:
         raise MediaRejected("CORRUPT_IMAGE") from error
+
+
+def cutout(original_bytes: bytes, model: str) -> CutoutResult:
+    """Runs a pinned model on a sanitized original and renders the results."""
+    original = _open_original(original_bytes)
     probability = predict_mask(original, model)
     return render(original, np.round(probability * 255).astype(np.uint8))
+
+
+def cutout_from_mask(original_bytes: bytes, mask_bytes: bytes) -> CutoutResult:
+    """Composes the renditions from a member-edited mask (P1.05).
+
+    The mask is a PNG exactly the size of the original; white keeps a pixel and
+    black removes it. Only the mask comes from the member: the cutout itself is
+    always composed here from the stored original.
+    """
+    original = _open_original(original_bytes)
+    try:
+        with Image.open(io.BytesIO(mask_bytes), formats=["PNG"]) as image:
+            image.load()
+            if image.size != original.size:
+                raise MediaRejected("CORRUPT_IMAGE")
+            mask = image.convert("L")
+    except (OSError, SyntaxError, ValueError) as error:
+        raise MediaRejected("CORRUPT_IMAGE") from error
+    return render(original, np.asarray(mask, dtype=np.uint8))

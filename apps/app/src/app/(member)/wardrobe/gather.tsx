@@ -43,9 +43,12 @@ function megabytes(bytes: number) {
 }
 
 export default function Gather() {
-  const params = useLocalSearchParams<{ label_for?: string }>();
+  const params = useLocalSearchParams<{ label_for?: string; replace?: string }>();
   // Opened from a piece's "Add care label": every photo is a label for that piece.
-  const targetId = typeof params.label_for === 'string' && UUID.test(params.label_for) ? params.label_for : undefined;
+  const labelTarget = typeof params.label_for === 'string' && UUID.test(params.label_for) ? params.label_for : undefined;
+  // Opened from a piece's "Replace photo": one new photo for that same piece.
+  const replaceTarget = !labelTarget && typeof params.replace === 'string' && UUID.test(params.replace) ? params.replace : undefined;
+  const targetId = labelTarget ?? replaceTarget;
   const target = useItem(targetId);
   const limits = useBootstrap().data?.upload_limits;
   const [selected, setSelected] = useState<Selected[]>([]);
@@ -74,8 +77,10 @@ export default function Gather() {
     setNotice(null);
     const picked = await pickImages({ capture });
     if (!limits || picked.length === 0) return;
-    const room = limits.max_files_per_batch - selected.length;
-    if (picked.length > room) {
+    const room = (replaceTarget ? 1 : limits.max_files_per_batch) - selected.length;
+    if (replaceTarget && picked.length > room) {
+      setNotice('A piece has one photo. Only the first photo you chose is used.');
+    } else if (picked.length > room) {
       setNotice(
         `You can add up to ${limits.max_files_per_batch} photos at a time, including care labels. ${picked.length - Math.max(room, 0)} ${picked.length - Math.max(room, 0) === 1 ? "photo wasn't" : "photos weren't"} added; upload these first, then gather the rest.`,
       );
@@ -87,7 +92,7 @@ export default function Gather() {
         ...image,
         id: crypto.randomUUID(),
         rotation: 0 as const,
-        kind: (targetId ? 'label' : 'garment') as Kind,
+        kind: (labelTarget ? 'label' : 'garment') as Kind,
         labelFor: null,
         preview: previewable(image.type) && Platform.OS === 'web' ? track(URL.createObjectURL(image.file)) : null,
         problem: !limits.formats.includes(image.type)
@@ -114,11 +119,11 @@ export default function Gather() {
     mutationFn: async () => {
       const files = usable.map((s) => ({
         client_file_id: s.id,
-        purpose: s.kind === 'label' ? 'care_label' : s.kind === 'group' ? 'grouped' : 'garment',
+        purpose: replaceTarget ? 'replacement' : s.kind === 'label' ? 'care_label' : s.kind === 'group' ? 'grouped' : 'garment',
         content_type: s.type,
         byte_size: s.size,
         rotation: s.rotation,
-        ...(s.kind === 'label' && targetId ? { target_item_id: targetId } : {}),
+        ...(targetId ? { target_item_id: targetId } : {}),
         ...(s.kind === 'label' && !targetId && s.labelFor ? { label_for: s.labelFor } : {}),
       }));
       const ids = JSON.stringify(files);
@@ -151,12 +156,14 @@ export default function Gather() {
     create.mutate();
   };
 
-  const title = targetId ? 'Add care label' : 'Gather · add pieces';
-  const subtitle = targetId
-    ? target.data
-      ? `For ${displayName(target.data)}. A label is attached to the piece; it never becomes a separate piece.`
-      : 'A label is attached to its piece; it never becomes a separate piece.'
-    : 'Start with a few pieces you wear often.';
+  const title = replaceTarget ? 'Replace photo' : labelTarget ? 'Add care label' : 'Gather · add pieces';
+  const subtitle = replaceTarget
+    ? `${target.data ? `For ${displayName(target.data)}. ` : ''}The piece keeps its details; its current photo stays until the new one is ready.`
+    : labelTarget
+      ? target.data
+        ? `For ${displayName(target.data)}. A label is attached to the piece; it never becomes a separate piece.`
+        : 'A label is attached to its piece; it never becomes a separate piece.'
+      : 'Start with a few pieces you wear often.';
 
   return (
     <Screen title={title} subtitle={subtitle}>

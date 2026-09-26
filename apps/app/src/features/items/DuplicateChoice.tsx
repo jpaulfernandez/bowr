@@ -19,11 +19,15 @@ import { useItem } from './queries';
 
 const reviewKeys = (userId: string) => [...userKeys.all(userId), 'duplicate-reviews'] as const;
 
-/** Possible duplicates for these upload entries or pieces (owner only, RLS). */
-export function useDuplicateReviews(column: 'entry_id' | 'item_id', ids: string[]) {
+/**
+ * Possible duplicates for these upload entries or pieces (owner only, RLS).
+ * `refreshKey` changes when the subjects' processing does: a near match is
+ * found only once tags and matching finish, so the question can appear late.
+ */
+export function useDuplicateReviews(column: 'entry_id' | 'item_id', ids: string[], refreshKey = '') {
   const { userId } = useSession();
   return useQuery({
-    queryKey: [...reviewKeys(userId ?? 'none'), column, ids.join(',')],
+    queryKey: [...reviewKeys(userId ?? 'none'), column, ids.join(','), refreshKey],
     queryFn: async ({ signal }) =>
       z.array(DuplicateReview).parse(
         await guardedRead(() => supabase.from('duplicate_reviews').select(DUPLICATE_REVIEW_SELECT).in(column, ids).abortSignal(signal)),

@@ -22,7 +22,7 @@ from PIL import Image
 
 from . import models
 from .colors import dominant_colors
-from .cutout import cutout
+from .cutout import cutout, cutout_from_mask
 from .embedding import embed
 from .media import MediaRejected, normalize
 from .parts import PROPOSAL_MODEL, crop, propose_parts
@@ -181,10 +181,17 @@ def _cutout_stage(job: dict[str, Any], lease: Lease, client: httpx.Client) -> di
     source = _download(client, job["sources"]["original"]["url"], spec["max_bytes"])
     if source is None:
         raise MediaRejected("SOURCE_MISSING")
-    try:
-        result = cutout(source, spec["model"])
-    except models.ModelUnavailable as missing:
-        raise MediaRejected("MODEL_UNAVAILABLE") from missing
+    if spec["model"] == "manual":
+        # The member's edited mask; the cutout is composed from the stored original.
+        mask = _download(client, job["sources"]["mask"]["url"], spec["max_bytes"])
+        if mask is None:
+            raise MediaRejected("SOURCE_MISSING")
+        result = cutout_from_mask(source, mask)
+    else:
+        try:
+            result = cutout(source, spec["model"])
+        except models.ModelUnavailable as missing:
+            raise MediaRejected("MODEL_UNAVAILABLE") from missing
     if lease.lost.is_set():
         return None
     renditions = {"cutout": result.cutout, "thumbnail": result.thumbnail, "mask": result.mask}

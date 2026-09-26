@@ -28,7 +28,7 @@ const Entries = z.array(
     failure_code: z.string().nullable(),
     declared_content_type: z.string(),
     created_at: z.string(),
-    purpose: z.enum(['garment', 'care_label', 'grouped']),
+    purpose: z.enum(['garment', 'care_label', 'grouped', 'replacement']),
     parent_entry_id: z.string().uuid().nullable(),
     target_item_id: z.string().uuid().nullable(),
     split_confirmed_at: z.string().nullable(),
@@ -189,7 +189,7 @@ export default function UploadReceipt() {
         {shown.map((entry, index) => {
           const task = local.get(entry.id);
           const number = numberOf(entry.id);
-          const label = `Photo ${number}${task ? `: ${task.name}` : ''}${entry.purpose === 'care_label' ? ' (care label)' : entry.purpose === 'grouped' ? ' (group photo)' : ''}`;
+          const label = `Photo ${number}${task ? `: ${task.name}` : ''}${entry.purpose === 'care_label' ? ' (care label)' : entry.purpose === 'grouped' ? ' (group photo)' : entry.purpose === 'replacement' ? ' (new photo for a piece)' : ''}`;
           const attached = labelState(entry);
           const review = reviewOf(entry);
           const made = pieces(entry);
@@ -199,7 +199,11 @@ export default function UploadReceipt() {
               ? made.length === 1
                 ? '1 piece added'
                 : `${made.length} pieces added`
-              : review?.state === 'pending'
+              : entry.purpose === 'replacement' && entry.state === 'ready'
+                ? entry.target_item_id
+                  ? 'Photo replaced · the new cutout follows'
+                  : 'Not used: the piece was removed'
+                : review?.state === 'pending'
                 ? 'Already in your Bower? Choose below.'
                 : review?.state === 'use_existing'
                   ? 'Kept your existing piece; no new piece added'
@@ -254,6 +258,13 @@ export default function UploadReceipt() {
                       label={`View existing piece for photo ${number}`}
                       variant="secondary"
                       onPress={() => router.push(`/wardrobe/items/${review.existing_item_id}`)}
+                    />
+                  ) : null}
+                  {entry.purpose === 'replacement' && entry.state === 'ready' && entry.target_item_id ? (
+                    <Button
+                      label={`View piece for photo ${number}`}
+                      variant="secondary"
+                      onPress={() => router.push(`/wardrobe/items/${entry.target_item_id}`)}
                     />
                   ) : null}
                   {awaitingParts(entry) ? (

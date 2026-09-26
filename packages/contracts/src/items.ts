@@ -27,6 +27,8 @@ export const ItemStage = z.object({
   failure_code: z.string().nullable(),
   media_revision: z.number().int(),
   can_retry: z.boolean(),
+  /** The cutout model, or 'manual' for an edited mask. */
+  model: z.string().nullable(),
 });
 export type ItemStage = z.infer<typeof ItemStage>;
 
@@ -66,7 +68,7 @@ export type Item = z.infer<typeof Item>;
 
 /** Columns selected for an Item, with its current attachments and stages. */
 export const ITEM_SELECT =
-  'id, lifecycle, name, category, subcategory, pattern, material, formality, colors, seasons, style_tags, attributes, brand, size_label, price_minor, currency, purchased_on, display_image, category_review_required, field_meta, revision, media_revision, created_at, item_assets(asset_id, role, media_revision, detached_at), item_stages(stage, state, failure_code, media_revision, can_retry)';
+  'id, lifecycle, name, category, subcategory, pattern, material, formality, colors, seasons, style_tags, attributes, brand, size_label, price_minor, currency, purchased_on, display_image, category_review_required, field_meta, revision, media_revision, created_at, item_assets(asset_id, role, media_revision, detached_at), item_stages(stage, state, failure_code, media_revision, can_retry, model)';
 
 /** Fields a member may change through update_item. */
 export const ItemPatch = z
