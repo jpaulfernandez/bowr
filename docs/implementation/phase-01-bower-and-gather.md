@@ -110,10 +110,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P1.06-T1** Implement text/tag/synonym search, OR within facets and AND across facets, stable cursor pagination, recently-added/category/color/name sorting and active filter chips. Preserve filters/scroll on detail/back. Add 50/300-item fixtures and lazy thumbnails.
-- [ ] **P1.06-T2** Implement accessible visible bulk Select, up-to-100 revisioned category/archive operations, lifecycle restore and counts excluding archived/deleted with processing reported separately. Never silently skip stale selected rows.
-- [ ] **P1.06-T3** Implement permanent item deletion: neutral tombstone, reusable attributes/vectors/suggestions scrubbed, attached original/cutout/thumbnail/mask/labels queued for deletion, late jobs fenced. Extend the lifecycle registry as later referencing domains are added.
-- [ ] **P1.06-T4** Expose empty/no-results/image-error/archive states and explicit delete consequences; no wear statistics before phase 2. Emit safe item-added/reviewed/upload events after the relevant successful action.
+- [x] **P1.06-T1** Implement text/tag/synonym search, OR within facets and AND across facets, stable cursor pagination, recently-added/category/color/name sorting and active filter chips. Preserve filters/scroll on detail/back. Add 50/300-item fixtures and lazy thumbnails.
+- [x] **P1.06-T2** Implement accessible visible bulk Select, up-to-100 revisioned category/archive operations, lifecycle restore and counts excluding archived/deleted with processing reported separately. Never silently skip stale selected rows.
+- [x] **P1.06-T3** Implement permanent item deletion: neutral tombstone, reusable attributes/vectors/suggestions scrubbed, attached original/cutout/thumbnail/mask/labels queued for deletion, late jobs fenced. Extend the lifecycle registry as later referencing domains are added.
+- [x] **P1.06-T4** Expose empty/no-results/image-error/archive states and explicit delete consequences; no wear statistics before phase 2. Emit safe item-added/reviewed/upload events after the relevant successful action.
 
 Acceptance:
 

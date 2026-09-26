@@ -1,4 +1,5 @@
 import { MediaGrants } from '@bowr/contracts';
+import type { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { Image, View } from 'react-native';
@@ -6,6 +7,37 @@ import { Text } from '../../components/Text';
 import { apiRequest } from '../../lib/api';
 import { userKeys } from '../../lib/query-keys';
 import { useSession } from '../../lib/session';
+
+type Grant = z.infer<typeof MediaGrants>[number];
+type Waiting = { assetId: string; variant: string; resolve: (grant: Grant) => void; reject: (error: unknown) => void };
+let waiting: Waiting[] = [];
+let flushing: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Images that mount together (a page of tiles) share one authorization request
+ * of up to 50 grants instead of one request each.
+ */
+function requestGrant(assetId: string, variant: string): Promise<Grant> {
+  return new Promise((resolve, reject) => {
+    waiting.push({ assetId, variant, resolve, reject });
+    flushing ??= setTimeout(flush, 10);
+  });
+}
+
+function flush() {
+  flushing = null;
+  const batch = waiting.slice(0, 50);
+  waiting = waiting.slice(50);
+  if (waiting.length > 0) flushing = setTimeout(flush, 0);
+  apiRequest('/media/access', {
+    method: 'POST',
+    body: { requests: batch.map((w) => ({ asset_id: w.assetId, variant: w.variant })) },
+    schema: MediaGrants,
+  }).then(
+    (grants) => batch.forEach((w, i) => w.resolve(grants[i]!)),
+    (error) => batch.forEach((w) => w.reject(error)),
+  );
+}
 
 /**
  * Shows a private asset through a short-lived signed URL. The URL lives only in
@@ -29,13 +61,7 @@ export function PrivateImage({
   const [failed, setFailed] = useState(false);
   const grant = useQuery({
     queryKey: [...userKeys.all(userId ?? 'none'), 'media', assetId, variant],
-    queryFn: async ({ signal }) =>
-      (await apiRequest('/media/access', {
-        method: 'POST',
-        body: { requests: [{ asset_id: assetId, variant }] },
-        schema: MediaGrants,
-        signal,
-      }))[0]!,
+    queryFn: () => requestGrant(assetId, variant),
     enabled: userId !== null,
     staleTime: 4 * 60_000,
     gcTime: 5 * 60_000,

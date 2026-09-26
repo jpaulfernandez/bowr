@@ -73,7 +73,7 @@ test.describe('P1.01 demo: add one piece and correct it without AI', () => {
     await expect(page.getByText('Check category')).toHaveCount(0);
 
     await page.goto('/wardrobe');
-    await expect(page.getByText('Your wardrobe · 1 piece')).toBeVisible();
+    await expect(page.getByText('1 piece', { exact: true })).toBeVisible();
     const tile = page.getByRole('link', { name: 'Blue Oxford, top' });
     await expect(tile).toBeVisible();
     await expectAccessible(page);

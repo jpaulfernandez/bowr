@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
+import { useSpacePress } from './useSpacePress';
 
 type Option<T extends string> = { value: T; label: string; swatch?: string };
 
@@ -29,30 +30,42 @@ export function ChipGroup<T extends string>({
       <View className="flex-row flex-wrap gap-2">
         {options.map((option) => {
           const checked = values.includes(option.value);
-          const disabled = !checked && full;
           return (
-            <Pressable
+            <Chip
               key={option.value}
-              role="checkbox"
-              aria-checked={checked}
-              aria-disabled={disabled}
-              disabled={disabled}
-              onPress={() => onChange(checked ? values.filter((v) => v !== option.value) : [...values, option.value])}
-              className={`min-h-target flex-row items-center gap-2 rounded-full border px-3 py-2 ${checked ? 'border-accent bg-accent-soft' : 'border-control-border bg-surface'} ${disabled ? 'opacity-60' : ''}`}
-            >
-              {option.swatch ? (
-                <View aria-hidden style={{ width: 16, height: 16, backgroundColor: option.swatch }} className="rounded-full border border-control-border" />
-              ) : null}
-              <Text className={`text-body ${checked ? 'text-accent' : 'text-text'}`}>{option.label}</Text>
-              {checked ? (
-                <Text aria-hidden className="text-body text-accent">
-                  ✓
-                </Text>
-              ) : null}
-            </Pressable>
+              option={option}
+              checked={checked}
+              disabled={!checked && full}
+              onToggle={() => onChange(checked ? values.filter((v) => v !== option.value) : [...values, option.value])}
+            />
           );
         })}
       </View>
     </View>
+  );
+}
+
+function Chip<T extends string>({ option, checked, disabled, onToggle }: { option: Option<T>; checked: boolean; disabled: boolean; onToggle: () => void }) {
+  const ref = useSpacePress(() => !disabled && onToggle());
+  return (
+    <Pressable
+      ref={ref}
+      role="checkbox"
+      aria-checked={checked}
+      aria-disabled={disabled}
+      disabled={disabled}
+      onPress={onToggle}
+      className={`min-h-target flex-row items-center gap-2 rounded-full border px-3 py-2 ${checked ? 'border-accent bg-accent-soft' : 'border-control-border bg-surface'} ${disabled ? 'opacity-60' : ''}`}
+    >
+      {option.swatch ? (
+        <View aria-hidden style={{ width: 16, height: 16, backgroundColor: option.swatch }} className="rounded-full border border-control-border" />
+      ) : null}
+      <Text className={`text-body ${checked ? 'text-accent' : 'text-text'}`}>{option.label}</Text>
+      {checked ? (
+        <Text aria-hidden className="text-body text-accent">
+          ✓
+        </Text>
+      ) : null}
+    </Pressable>
   );
 }

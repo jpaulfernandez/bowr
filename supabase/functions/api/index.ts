@@ -323,6 +323,38 @@ route('POST', /^\/v1\/items\/([^/]+)\/recut$/, async ({ req, requestId, params }
   return json(req, requestId, 202, { ...result, poll_after_ms: 2000 });
 });
 
+// Permanently deletes a piece at the revision the member saw. Access to its
+// images ends at once; the deletion service then removes their bytes.
+route('DELETE', /^\/v1\/items\/([^/]+)$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  const key = idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  const body = await jsonBody(req, ['expected_revision']);
+  if (!Number.isSafeInteger(body.expected_revision)) {
+    throw appError(422, 'VALIDATION_FAILED', { field: 'expected_revision' });
+  }
+  const result = await callService('svc_delete_item', {
+    p_user_id: userId,
+    p_request_id: key,
+    p_item_id: params[0],
+    p_expected_revision: body.expected_revision,
+  });
+  afterResponse(processMediaDeletion());
+  return json(req, requestId, 200, result);
+});
+
+// Whether a deleted piece's images are confirmed gone ("deletion_pending" until then).
+route('GET', /^\/v1\/items\/([^/]+)\/deletion$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  return json(
+    req,
+    requestId,
+    200,
+    await callService('svc_item_deletion_status', { p_user_id: userId, p_item_id: params[0] }),
+  );
+});
+
 // Removes a care-label attachment; the piece and its values stay.
 route('DELETE', /^\/v1\/media\/([^/]+)$/, async ({ req, requestId, params }) => {
   const { userId } = await requireCaller(req);

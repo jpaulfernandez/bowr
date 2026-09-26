@@ -1,3 +1,4 @@
+import { categories } from '@bowr/domain';
 import { z } from 'zod';
 
 /**
@@ -56,5 +57,8 @@ export const AnalyticsEvent = z.discriminatedUnion('event', [
     })
     .strict(),
   z.object({ event: z.literal('client_error'), properties: z.object({ code, route }).strict() }).strict(),
+  // PRD: is onboarding happening? Categorical fields only; never names or photos.
+  z.object({ event: z.literal('item_added'), properties: z.object({ source: z.enum(['upload', 'group']) }).strict() }).strict(),
+  z.object({ event: z.literal('item_reviewed'), properties: z.object({ category: z.enum(categories) }).strict() }).strict(),
 ]);
 export type AnalyticsEvent = z.infer<typeof AnalyticsEvent>;

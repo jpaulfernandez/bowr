@@ -1,6 +1,6 @@
 // P1.03 integration: a mixed batch with care labels. Labels attach to one
 // garment, never create pieces, fill only unlocked facts, and can be removed.
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api, maintenance } from '../../../tests/support/api';
 import { fakeGemini } from '../../../tests/support/fake-gemini';
@@ -271,5 +271,60 @@ describe('P1.03 authority: a label names one of the member’s own garments', ()
     expect(big.response.status).toBe(201);
     const [asset] = await sql()`select purpose from public.media_assets where id = ${big.entries.get('l').asset_id}`;
     expect(asset!.purpose).toBe('care_label');
+  });
+});
+
+describe('P1.03 concurrency: a label and its garment finishing at the same moment', () => {
+  it('the label is attached whichever validation commits first', async () => {
+    await settleItemStages();
+    const garmentId = randomUUID();
+    const files = [
+      { client_file_id: garmentId, purpose: 'garment', content_type: 'image/png', byte_size: 100 },
+      { client_file_id: randomUUID(), purpose: 'care_label', content_type: 'image/png', byte_size: 100, label_for: garmentId },
+    ];
+    const [{ r }] = await sql()`select public.svc_create_upload_batch(${a.id}, ${randomUUID()}, 'bowr-private', ${sql().json(files)}) as r`;
+    const entries = (r.entries as Array<{ entry_id: string; asset_id: string; client_file_id: string }>).map((e) => ({
+      ...e,
+      label: e.client_file_id !== garmentId,
+    }));
+    // Both validations are claimed by the harness, so both run at once.
+    const jobs: Record<string, string> = {};
+    for (const entry of entries) {
+      await sql()`select public.svc_complete_upload_entry(${a.id}, ${randomUUID()}, ${entry.entry_id}, 100)`;
+      const [{ id }] = await sql()`select id from private.jobs where target_id = ${entry.asset_id} and kind = 'validate_upload'`;
+      const hash = createHash('sha256').update(entry.entry_id).digest('hex');
+      // Set directly: the per-member running limit would refuse the second claim.
+      await sql()`update private.jobs set claim_nonce_hash = ${hash}, claim_expires_at = now() + interval '5 minutes' where id = ${id}`;
+      await sql()`select public.svc_claim_job(${id}, ${hash})`;
+      jobs[entry.label ? 'label' : 'garment'] = id;
+    }
+    const output = (assetId: string) => ({
+      object_key: `users/${a.id}/assets/${assetId}/1/original-g1.webp`,
+      width: 800,
+      height: 600,
+      byte_size: 1000,
+      sha256: randomBytes(32).toString('hex'),
+    });
+    const [label, garment] = [entries.find((e) => e.label)!, entries.find((e) => !e.label)!];
+
+    // The label's completion runs first and stays open; the garment's starts meanwhile.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const first = sql().begin(async (tx) => {
+      await tx`select public.svc_complete_validation(${jobs.label!}, 1, 'ready', ${tx.json(output(label.asset_id))}, null)`;
+      await held;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const second = sql().begin(async (tx) => {
+      await tx`select public.svc_complete_validation(${jobs.garment!}, 1, 'ready', ${tx.json(output(garment.asset_id))}, null)`;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    release();
+    await Promise.all([first, second]);
+
+    const [piece] = await sql()`select id from public.items where source_entry_id = ${garment.entry_id}`;
+    expect(await sql()`select 1 from public.item_assets where item_id = ${piece!.id} and asset_id = ${label.asset_id} and role = 'label'`).toHaveLength(1);
+    // The harness made no real photos: its queued stages are not run.
+    await sql()`update private.jobs set state = 'canceled', completed_at = now() where target_id = ${piece!.id} and state = 'queued'`;
   });
 });

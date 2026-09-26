@@ -44,6 +44,7 @@ const messages: Record<string, string> = {
   ORIENTATION_MISMATCH: 'The photo changed while you were choosing pieces. Reload and try again.',
   ALREADY_DECIDED: 'This was already decided.',
   EXISTING_REMOVED: 'The matching piece was removed. Add this one instead.',
+  INVALID_CURSOR: 'This list changed. Reload to see the latest pieces.',
   MASK_REJECTED: "The edited edges couldn't be used. Reload the piece and try again.",
   REAUTH_REQUIRED: 'Confirm with a new sign-in link first.',
   OWNER_TRANSFER_REQUIRED: 'Transfer ownership to another member before deleting this account.',

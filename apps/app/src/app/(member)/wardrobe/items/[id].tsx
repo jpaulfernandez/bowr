@@ -1,11 +1,12 @@
 import { categoryLabel, displayName, needsCategory } from '@bowr/domain';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { z } from 'zod';
 import { Text as RNText, useWindowDimensions, View } from 'react-native';
 import { Banner } from '../../../../components/Banner';
 import { Button } from '../../../../components/Button';
+import { ConfirmDialog } from '../../../../components/ConfirmDialog';
 import { RadioGroup } from '../../../../components/RadioGroup';
 import { Screen } from '../../../../components/Screen';
 import { Heading, Text } from '../../../../components/Text';
@@ -14,7 +15,7 @@ import { LabelsSection } from '../../../../features/items/LabelsSection';
 import { PieceEditor } from '../../../../features/items/PieceEditor';
 import { PieceImage } from '../../../../features/items/PieceImage';
 import { ProcessingPanel } from '../../../../features/items/ProcessingPanel';
-import { assetFor, stageFor, useItem, useRetryStage, useUpdateItem } from '../../../../features/items/queries';
+import { assetFor, stageFor, useBulkUpdate, useDeleteItem, useItem, useRetryStage, useUpdateItem } from '../../../../features/items/queries';
 import { apiRequest } from '../../../../lib/api';
 import { ApiError } from '../../../../lib/errors';
 import { userKeys } from '../../../../lib/query-keys';
@@ -52,6 +53,10 @@ export default function PieceDetail() {
     },
     onError: (error) => setNotice(error instanceof ApiError ? error.message : "The new cutout didn't start. Try again."),
   });
+  const lifecycle = useBulkUpdate();
+  const remove = useDeleteItem(item.data);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const deleteKey = useRef<string | null>(null);
   const reviews = useDuplicateReviews(
     'item_id',
     typeof id === 'string' ? [id] : [],
@@ -74,6 +79,24 @@ export default function PieceDetail() {
   const stage = stageFor(piece, 'cutout');
   const shown = view ?? (piece.display_image === 'cutout' && cutout ? 'cutout' : 'original');
   const imageSize = Math.min(480, Math.max(240, width - 48));
+  const setLifecycle = (kind: 'archive' | 'restore') => {
+    setNotice(null);
+    lifecycle.mutate(
+      { items: [piece], operation: { kind }, key: crypto.randomUUID() },
+      { onError: (error) => setNotice(error instanceof ApiError ? error.message : "That change didn't save. Try again.") },
+    );
+  };
+  const deletePiece = () => {
+    deleteKey.current ??= crypto.randomUUID();
+    remove.mutate(deleteKey.current, {
+      onSuccess: () => router.replace(`/wardrobe?deleted=${piece.id}`),
+      onError: (error) => {
+        deleteKey.current = null;
+        setConfirmingDelete(false);
+        setNotice(error instanceof ApiError ? error.message : "The piece wasn't deleted. Try again.");
+      },
+    });
+  };
   const setDisplay = (display_image: 'cutout' | 'original') => {
     setNotice(null);
     update.mutate(
@@ -84,6 +107,11 @@ export default function PieceDetail() {
 
   return (
     <Screen title={displayName(piece)} subtitle={piece.category ? categoryLabel[piece.category] : 'Category not set'}>
+      {piece.lifecycle === 'archived' ? (
+        <Banner tone="info" message="This piece is archived. It stays out of new suggestions until you restore it.">
+          <Button label="Restore" variant="secondary" busy={lifecycle.isPending} onPress={() => setLifecycle('restore')} />
+        </Banner>
+      ) : null}
       {review ? (
         <View className="max-w-prose">
           <DuplicateChoice
@@ -185,9 +213,33 @@ export default function PieceDetail() {
           <Heading level={2}>Details</Heading>
           <PieceEditor key={piece.id} item={piece} />
           <LabelsSection item={piece} />
+          <View className="gap-3">
+            <Heading level={2}>Keep or remove</Heading>
+            <View className="flex-row flex-wrap gap-2">
+              {piece.lifecycle === 'active' ? (
+                <Button label="Archive" variant="secondary" busy={lifecycle.isPending} onPress={() => setLifecycle('archive')} />
+              ) : null}
+              <Button label="Delete permanently" variant="quiet" onPress={() => setConfirmingDelete(true)} />
+            </View>
+            <Text variant="secondary">Archiving keeps the piece and its photos but leaves it out of new suggestions.</Text>
+          </View>
         </View>
       </View>
       <Button label="Back to Bower" variant="quiet" className="self-start" onPress={() => router.replace('/wardrobe')} />
+      <ConfirmDialog
+        visible={confirmingDelete}
+        title="Delete this piece permanently?"
+        consequences={[
+          'Its photos, cutout and care labels will be deleted.',
+          'Its details and matching data will be erased.',
+          'This cannot be undone. To keep it out of sight instead, archive it.',
+        ]}
+        confirmLabel="Delete piece"
+        destructive
+        busy={remove.isPending}
+        onConfirm={deletePiece}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </Screen>
   );
 }

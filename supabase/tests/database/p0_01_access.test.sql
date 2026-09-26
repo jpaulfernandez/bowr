@@ -46,7 +46,7 @@ select is(
   (select array_agg(p.proname::text order by p.proname)
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')),
-  array['get_bootstrap', 'update_item', 'update_profile'], 'authenticated executes only allowlisted public functions');
+  array['bulk_update_items', 'get_bootstrap', 'search_items', 'update_item', 'update_profile'], 'authenticated executes only allowlisted public functions');
 select is(
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')),

@@ -1,6 +1,6 @@
 import { EntryState } from '@bowr/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 import { z } from 'zod';
@@ -12,6 +12,7 @@ import { DuplicateChoice, useDuplicateReviews } from '../../../../features/items
 import { entryStatus } from '../../../../features/uploads/copy';
 import { PrivateImage } from '../../../../features/uploads/PrivateImage';
 import { uploadManager, useLocalUploads } from '../../../../features/uploads/upload-manager';
+import { track } from '../../../../lib/analytics';
 import { apiRequest, guardedRead } from '../../../../lib/api';
 import { formatDateTime } from '../../../../lib/format';
 import { userKeys } from '../../../../lib/query-keys';
@@ -38,6 +39,9 @@ const Entries = z.array(
 type Entry = z.infer<typeof Entries>[number];
 
 const inProgress = (entry: Entry) => entry.state === 'uploaded' || entry.state === 'validating';
+
+// Pieces already reported as added in this browser session (the event carries no IDs).
+const reportedPieces = new Set<string>();
 
 export default function UploadReceipt() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -105,6 +109,16 @@ export default function UploadReceipt() {
   const reviews = useDuplicateReviews('entry_id', held);
   const reviewOf = (entry: Entry) => reviews.data?.find((r) => r.entry_id === entry.id) ?? null;
   const pieces = (entry: Entry) => entry.items.filter((i) => i.lifecycle !== 'deleted');
+  useEffect(() => {
+    for (const entry of entries.data ?? []) {
+      if (entry.purpose !== 'garment' && entry.purpose !== 'grouped') continue;
+      for (const item of entry.items) {
+        if (item.lifecycle === 'deleted' || reportedPieces.has(item.id)) continue;
+        reportedPieces.add(item.id);
+        track({ event: 'item_added', properties: { source: entry.purpose === 'grouped' ? 'group' : 'upload' } });
+      }
+    }
+  }, [entries.data]);
   const awaitingParts = (entry: Entry) => entry.purpose === 'grouped' && entry.state === 'ready' && entry.split_confirmed_at === null;
 
   const cancel = useMutation({

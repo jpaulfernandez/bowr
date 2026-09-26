@@ -1,8 +1,9 @@
 import { ITEM_SELECT, Item, ItemPatch, UpdatedItem } from '@bowr/contracts';
-import { displayState, type DisplayState } from '@bowr/domain';
+import { displayState, searchFilters, type BowerQuery, type Category, type DisplayState } from '@bowr/domain';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { apiRequest, guardedRead, rpc } from '../../lib/api';
+import { track } from '../../lib/analytics';
 import { apiErrorFromRpc } from '../../lib/errors';
 import { userKeys } from '../../lib/query-keys';
 import { useSession } from '../../lib/session';
@@ -33,30 +34,89 @@ export const isProcessing = (item: Item) =>
 
 const Page = z.array(Item);
 
-/** Bower pages, newest first, with a stable keyset cursor (created_at, id). */
-export function useBowerItems() {
+const SearchPage = z.object({
+  ids: z.array(z.string().uuid()),
+  next_cursor: z.string().nullable(),
+  total: z.number().int(),
+  processing: z.number().int(),
+});
+
+/**
+ * Bower pages for a search (text, facets, sort) with the server's opaque cursor.
+ * The owner-scoped RPC returns ordered IDs; the pieces are then read through RLS.
+ */
+export function useSearchItems(query: BowerQuery) {
   const { userId } = useSession();
   return useInfiniteQuery({
-    queryKey: itemKeys.list(userId ?? 'none'),
-    initialPageParam: null as { created_at: string; id: string } | null,
+    queryKey: [...itemKeys.list(userId ?? 'none'), query],
+    initialPageParam: null as string | null,
     queryFn: async ({ pageParam, signal }) => {
-      let query = supabase
-        .from('items')
-        .select(ITEM_SELECT)
-        .eq('lifecycle', 'active')
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false })
-        .limit(PAGE_SIZE);
-      if (pageParam) {
-        query = query.or(`created_at.lt.${pageParam.created_at},and(created_at.eq.${pageParam.created_at},id.lt.${pageParam.id})`);
-      }
-      return Page.parse(await guardedRead(() => query.abortSignal(signal)));
+      const page = await rpc(
+        'search_items',
+        { p_query: query.q.trim() || null, p_filters: searchFilters(query), p_sort: query.sort, p_cursor: pageParam, p_limit: PAGE_SIZE },
+        SearchPage,
+        signal,
+      );
+      const rows = page.ids.length
+        ? Page.parse(await guardedRead(() => supabase.from('items').select(ITEM_SELECT).in('id', page.ids).abortSignal(signal)))
+        : [];
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      return { ...page, items: page.ids.map((id) => byId.get(id)).filter((row): row is Item => row !== undefined) };
     },
-    getNextPageParam: (page) =>
-      page.length === PAGE_SIZE ? { created_at: page[page.length - 1]!.created_at, id: page[page.length - 1]!.id } : undefined,
+    getNextPageParam: (page) => page.next_cursor ?? undefined,
     enabled: userId !== null,
-    refetchInterval: (query) => (query.state.data?.pages.some((page) => page.some(isProcessing)) ? 3000 : false),
+    placeholderData: (previous) => previous,
+    refetchInterval: (q) => (q.state.data?.pages.some((page) => page.items.some(isProcessing)) ? 3000 : false),
     refetchIntervalInBackground: false,
+  });
+}
+
+const BulkResult = z.object({ updated: z.number().int() });
+export type BulkOperation = { kind: 'archive' } | { kind: 'restore' } | { kind: 'category'; category: Category };
+
+/** Up to 100 pieces at the revisions shown; the server applies all or none. */
+export function useBulkUpdate() {
+  const { userId } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ items, operation, key }: { items: Array<Pick<Item, 'id' | 'revision'>>; operation: BulkOperation; key: string }) =>
+      rpc(
+        'bulk_update_items',
+        { p_request_id: key, p_items: items.map((i) => ({ id: i.id, expected_revision: i.revision })), p_operation: operation },
+        BulkResult,
+      ),
+    onSuccess: (_result, { operation }) => {
+      if (operation.kind === 'category') track({ event: 'item_reviewed', properties: { category: operation.category } });
+    },
+    onSettled: () => {
+      if (userId) void queryClient.invalidateQueries({ queryKey: itemKeys.all(userId) });
+    },
+  });
+}
+
+/** Permanent deletion at the revision shown. */
+export function useDeleteItem(item: Item | null | undefined) {
+  const { userId } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) =>
+      apiRequest(`/items/${item!.id}`, { method: 'DELETE', idempotencyKey: key, body: { expected_revision: item!.revision }, schema: z.unknown() }),
+    onSettled: () => {
+      if (userId) void queryClient.invalidateQueries({ queryKey: itemKeys.all(userId) });
+    },
+  });
+}
+
+const DeletionStatus = z.object({ state: z.enum(['deletion_pending', 'deleted']) });
+
+/** Polls until a deleted piece's images are confirmed gone. */
+export function useDeletionStatus(itemId: string | undefined) {
+  const { userId } = useSession();
+  return useQuery({
+    queryKey: [...itemKeys.all(userId ?? 'none'), 'deletion', itemId],
+    queryFn: ({ signal }) => apiRequest(`/items/${itemId}/deletion`, { schema: DeletionStatus, signal }),
+    enabled: userId !== null && typeof itemId === 'string',
+    refetchInterval: (q) => (q.state.data?.state === 'deleted' ? false : 3000),
   });
 }
 
@@ -105,6 +165,9 @@ export function useUpdateItem(item: Item | null | undefined) {
         { p_request_id: key, p_item_id: item!.id, p_expected_revision: item!.revision, p_patch: ItemPatch.parse(patch) },
         UpdatedItem,
       ),
+    onSuccess: (_result, { patch }) => {
+      if (patch.category) track({ event: 'item_reviewed', properties: { category: patch.category } });
+    },
     onSettled: () => {
       if (!userId || !item) return;
       void queryClient.invalidateQueries({ queryKey: itemKeys.all(userId) });
