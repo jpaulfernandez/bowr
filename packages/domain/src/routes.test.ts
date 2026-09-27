@@ -47,6 +47,12 @@ describe('decideRoute', () => {
     expect(decideRoute('/onboarding', pending)).toEqual({ type: 'redirect', to: '/invite' });
   });
 
+  it('gates saved outfit routes with the member session', () => {
+    expect(decideRoute('/outfits/new', member)).toEqual({ type: 'allow' });
+    expect(decideRoute('/outfits/new', pending)).toEqual({ type: 'redirect', to: '/invite' });
+    expect(safeReturnTo('/outfits/new')).toBe('/outfits/new');
+  });
+
   it('moves admitted members away from public and gate screens', () => {
     expect(decideRoute('/auth', member)).toEqual({ type: 'redirect', to: '/wardrobe' });
     expect(decideRoute('/invite', member)).toEqual({ type: 'redirect', to: '/wardrobe' });

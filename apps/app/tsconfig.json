@@ -3,7 +3,12 @@
   "compilerOptions": {
     "strict": true,
     "noUncheckedIndexedAccess": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "include": ["src", "nativewind-env.d.ts", "expo-env.d.ts", ".expo/types/**/*.ts"]
+  "include": [
+    "src",
+    "nativewind-env.d.ts"
+  ]
 }
