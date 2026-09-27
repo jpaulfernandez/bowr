@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw
 from bowr_worker import models
 from bowr_worker.colors import dominant_colors
 from bowr_worker.cutout import cutout
-from bowr_worker.embedding import DEV_SPACE, embed
+from bowr_worker.embedding import DEV_SPACE, embed, fashion_clip_space
 from bowr_worker.media import MediaRejected
 from bowr_worker.pipeline import run_job
 from bowr_worker.validation import validate
@@ -83,6 +83,35 @@ def test_an_unknown_or_disabled_vector_space_is_refused_not_substituted(
     monkeypatch.delenv("BOWR_DEV_EMBEDDING")
     with pytest.raises(models.ModelUnavailable):
         embed(navy_cutout(), *DEV_SPACE)
+
+
+def test_fashion_clip_embeddings_are_finite_normalized_512_values_and_deterministic() -> None:
+    space = fashion_clip_space()
+    assert space is not None
+    vector = np.array(embed(navy_cutout(), *space))
+    assert vector.shape == (512,)
+    assert np.all(np.isfinite(vector))
+    assert np.linalg.norm(vector) == pytest.approx(1.0, abs=1e-5)
+    assert embed(navy_cutout(), *space) == list(vector)
+    assert float(vector @ np.array(embed(two_tone_cutout(), *space))) < 0.99
+    with pytest.raises(MediaRejected) as rejected:
+        embed(encode(Image.new("RGBA", (64, 64), (0, 0, 0, 0)), "WEBP"), *space)
+    assert rejected.value.code == "NO_FOREGROUND"
+
+
+def test_fashion_clip_is_refused_at_another_revision_or_with_altered_weights(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    name, revision, preprocess = fashion_clip_space()
+    source = navy_cutout()
+    for space in [(name, "main", preprocess), (name, revision, "clip-224")]:
+        with pytest.raises(models.ModelUnavailable):
+            embed(source, *space)
+    (tmp_path / "fashion_clip.onnx").write_bytes(b"not the pinned weights")
+    monkeypatch.setattr(models, "MODEL_DIR", tmp_path)
+    monkeypatch.setattr(models, "_sessions", {})
+    with pytest.raises(models.ModelUnavailable):
+        embed(source, name, revision, preprocess)
 
 
 def claim(stage: str) -> dict:

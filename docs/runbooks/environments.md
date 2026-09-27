@@ -1,6 +1,6 @@
 # Environments and secrets
 
-Status: local environment implemented; staging and production are not provisioned yet. Deployment and rollback: [deploy.md](deploy.md). Health, alerts and recovery: [operations.md](operations.md). Backups: [backup-restore.md](backup-restore.md).
+Status: local environment implemented. Initial hosted Supabase project `bowr` (`vygtmevivuoeifikdild`, Tokyo) exists; Resend SMTP and email-only Auth were configured and read back on 27 September 2026. The staging backend, web app, buckets and worker were deployed on 27 September 2026 (see "Staging inventory" below). Auth callback configuration, storage and dispatch credentials, and delivery verification remain open. Production release is not approved. Deployment and rollback: [deploy.md](deploy.md). Health, alerts and recovery: [operations.md](operations.md). Backups: [backup-restore.md](backup-restore.md).
 
 bowr uses separate **local**, **staging** and **production** environments (ARCHITECTURE section 14.1). Each has its own Supabase project, Auth callbacks, secrets and, in later slices, R2 bucket, Modal environment and Gemini project. Never copy a secret between environments, and never commit one.
 
@@ -19,6 +19,21 @@ bowr uses separate **local**, **staging** and **production** environments (ARCHI
 | SMTP host, user, password, sender | Supabase Auth SMTP settings | Magic-link email | Mailpit (local) |
 | `DATABASE_URL` | Operator shell only | `pnpm ops:bootstrap-owner` | Local database URL |
 
+## Staging inventory (27 September 2026)
+
+| Resource | Value |
+| --- | --- |
+| Supabase project | `bowr` (`vygtmevivuoeifikdild`), Tokyo |
+| Web | Vercel project `bowr-staging`, `https://bowr-staging.vercel.app` |
+| Private media bucket | R2 `bowr-staging-media`, location hint APAC |
+| Deletion journal bucket | R2 `bowr-staging-journal`, location hint APAC, 30-day expiry |
+| Worker | Modal app `bowr-worker`, `https://jpaul-fernandez18--bowr-worker-wake.modal.run` (proxy auth required). Region not pinned |
+| Operator secrets | `.env.staging` in the repository root (gitignored, mode 600). Holds the generated staging secrets for `pnpm ops:*` commands and the GitHub `HEALTH_CHECK_TOKEN`. Move it to a password manager |
+
+Location hints and regions are not guarantees of processing location.
+
+Auth Site URL and redirect allowlist, the Modal proxy token and the bucket-scoped R2 token were set on 27 September 2026. The R2 token has object permissions only, so bucket CORS and lifecycle rules are managed with `wrangler`. Still open: the owner's first sign-in and `pnpm ops:bootstrap-owner`.
+
 ## Generating secrets
 
 Use at least 32 random bytes for `INVITE_HMAC_SECRET` and `MAINTENANCE_SECRET`, for example `openssl rand -base64 48`. Set Edge secrets with `supabase secrets set --project-ref <ref> NAME=value`.
@@ -27,10 +42,15 @@ Rotating `INVITE_HMAC_SECRET` invalidates every unused invite code: revoke them 
 
 ## Staging Auth configuration (P0.02-T3 gate, not yet done)
 
-1. Create a Google OAuth client for the staging web origin. Add exactly `https://<staging-host>/auth/callback` to Supabase Auth's redirect allowlist, and set the Site URL to `https://<staging-host>`.
-2. Enable the Google provider with PKCE. Set `EXPO_PUBLIC_AUTH_GOOGLE_ENABLED=true` in the staging web build only after step 4 passes.
-3. Configure custom SMTP with a verified sender domain (SPF/DKIM). The default Supabase mailer is for testing and restricts recipients.
-4. Verify that an invited address outside the project team receives a magic link. Check that both Google and email sign-in complete on the deployed host, and that expired and other-browser links show the recovery screen. Record the result in `docs/implementation/evidence/P0.02.md`.
+Owner decision (27 September 2026): launch staging with email magic links only. Google sign-in is deferred; keep the hosted Google provider disabled and `EXPO_PUBLIC_AUTH_GOOGLE_ENABLED=false`. Google acceptance checks remain deferred, not passed.
+
+The initial web deployment will use a Vercel-generated hostname (owner decision, 27 September 2026). `janpaulfernandez.com` is the email sender domain; do not change its website routing. Set Auth callbacks and exact-origin CORS from the actual Vercel hostname after deployment.
+
+1. Add exactly `https://<staging-host>/auth/callback` to Supabase Auth's redirect allowlist, and set the Site URL to `https://<staging-host>`.
+2. Configure Resend custom SMTP with a verified sender domain (SPF/DKIM): host `smtp.resend.com`, port `465`, username `resend`, and the Resend API key as the password. Keep the key in hosted Auth configuration, never the web build. Configured sender: `bowr <bowr@janpaulfernandez.com>`, using the owner's supplied domain. Hosted settings readback passed; domain authorization and delivery still need an end-to-end test. See [Resend SMTP](https://resend.com/docs/send-with-smtp).
+3. Verify that an invited address outside the project team receives a magic link. Check email sign-in, fresh authentication, expired-link and other-browser recovery on the deployed host. Record the result in `docs/implementation/evidence/P0.02.md`.
+
+If Google is enabled later, its OAuth client's authorized redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`; the app callback above belongs in Supabase's redirect allowlist. Complete Google-specific checks before showing the sign-in button.
 
 ## Scheduled maintenance (staging and production)
 

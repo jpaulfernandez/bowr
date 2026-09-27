@@ -9,6 +9,8 @@
 
 Use the existing upload, asset, worker, gateway and cleanup paths. Implement `items`, `item_assets`, `item_suggestions` and versioned `item_embeddings` as their slices need them. Keep lifecycle, processing stage and review status separate. No outfits or logged-wear claims yet; phase 2 supplies wear data and activates those actions/sorts.
 
+Owner decision (27 September 2026): camera denial applies to the web build. **Take photo** on web uses the browser's capture input, so the app cannot detect a denial itself; P1.03-A4 passes only when a real phone with camera access denied to the browser still lets the member add photos through **Choose photos**. The automated file-chooser fallback (P0.03 E2E) does not prove this.
+
 ## P1.01 — Add one piece and correct it without AI
 
 **Depends on:** Phase 0.  
@@ -145,5 +147,12 @@ Acceptance:
 - [ ] F1–F2 journeys and fifty-piece pilot pass; grouped/label/duplicate/repair cases are demonstrated.
 - [ ] Late inference never overrides user/media revisions; matching infrastructure is usable before phase 2.
 - [ ] Resource/format/model evidence and remaining quality limitations are recorded.
+
+Exit status (27 September 2026): every P1 slice passes its local acceptance against the real local stack, and CI run `36290823421` on `2c6afbf` passed; evidence is in [evidence/](evidence/). No exit item is checked. Open: FashionCLIP and production-space vectors (P1.02-T1, P1.02-A2), the paid extraction comparison and candidate pin (P1.07-T1/T2, P1.07-A2), the fifty-piece pilot and real benchmarks (P1.07-T3, P1.07-A1/A3), staging deletion proof (P1.06-A3) and the device pass (P1.01-A4, P1.03-A4, P1.05-A4, P1.06-A4, P1.07-A4). Until then, embeddings outside local stay disabled and AI stays off (`AI_ENABLED=false`). Work is tracked in the [completion plan](phase-00-01-completion-plan.md).
+
+Accepted limitations (owner decision, 27 September 2026), recorded without an owning task:
+
+- The per-member running limit is checked when a worker claim is issued, not when it is used, so two claims issued before either is used can both run (found in P1.06). Reopen it when worker capacity is tuned or when more than one member processes batches at once.
+- A fresh-authentication link opened in the same second as its request reads as expired (found in P1.07). The member can request another link. Reopen it if a member reports it.
 
 Pause inference or new upload admission independently, preserving existing Bower/manual edits. Roll back compatible worker/model configuration without comparing incompatible embeddings. Retain original/media versions until safely detached; never clear canonical edits to rerun extraction.

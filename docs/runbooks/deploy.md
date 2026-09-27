@@ -1,6 +1,6 @@
 # Deployment, promotion and rollback
 
-Status: CI is implemented (`.github/workflows/ci.yml`). Staging and production are not provisioned yet, so the promotion steps below have not been exercised. That is gate P0.07-A4.
+Status: CI is implemented (`.github/workflows/ci.yml`). The initial hosted Supabase project and email configuration exist (see [environments.md](environments.md)); promotion steps 1–4 were exercised once on staging on 27 September 2026 ([evidence](../implementation/evidence/P0.07.md)). The smoke checks and rollback have not been exercised. That is gate P0.07-A4.
 
 ## What CI proves on every change
 
@@ -25,7 +25,7 @@ Promote one commit that passed CI. Every schema change is additive, so the previ
 4. **Web:** build with the environment's `EXPO_PUBLIC_*` values using `pnpm build:web`. This fails if the bundle contains a secret or a source map. Deploy `apps/app/.vercel/output` with `vercel deploy --prebuilt` (add `--prod` for production).
 5. **Smoke checks:**
    - A deep link such as `/settings` reloads.
-   - Google and email-link sign-in both complete on the deployed host.
+   - Email-link sign-in and fresh authentication complete on the deployed host. Google sign-in is deferred by the owner (27 September 2026); keep its provider and public feature flag disabled.
    - The health check returns 200.
    - An upload reaches Ready.
    - `pnpm ops:ai-smoke` runs only after P0.05-T5.

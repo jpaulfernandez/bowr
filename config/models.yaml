@@ -86,3 +86,11 @@ local_models:
     revision: rembg-v0.0.0
     sha256: 309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8
     license: Apache-2.0 (upstream U-2-Net; ONNX export published by rembg, MIT)
+  # Item embeddings (P1.02): FashionCLIP, 512 dimensions. The upstream
+  # repository's own ONNX export, pinned to a commit. License read from the
+  # model card on 27 September 2026.
+  fashion_clip:
+    source: https://huggingface.co/patrickjohncyh/fashion-clip/resolve/7e3ba62ce16b379a1ab479346b66f192e76f51b7/onnx/model.onnx
+    revision: 7e3ba62ce16b379a1ab479346b66f192e76f51b7
+    sha256: dc4c724479e49d1da9598969125353113a341bd4fd5a1dbc7d528d3f1545bba9
+    license: MIT (patrickjohncyh/fashion-clip model card)
