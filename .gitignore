@@ -9,6 +9,11 @@ test-results/
 playwright-report/
 .DS_Store
 
+# Local Resend credential supplied for staging setup
+/resend.md
+/r2.md
+.wrangler/
+
 # Expo / web export
 apps/app/.expo/
 apps/app/dist/

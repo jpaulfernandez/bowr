@@ -11,6 +11,8 @@ Provision local tooling first. Staging/provider credentials are needed only at t
 
 The original one-week estimate is high risk. P0.04 establishes the first measured processing path; re-estimate then. Phase 0 is not externally ready until its account, cleanup, budget, and recovery checks pass.
 
+Owner decision (27 September 2026): the initial staging deployment uses email magic links through Resend. Google sign-in and its acceptance checks are deferred, not passed. Keep Google disabled in hosted Auth and `EXPO_PUBLIC_AUTH_GOOGLE_ENABLED=false`; complete the email admission and fresh-authentication gates. See [environment setup](../runbooks/environments.md).
+
 ## P0.01 — Sign in locally and reach only your private shell
 
 **Depends on:** None.  
@@ -39,14 +41,14 @@ Tasks:
 
 - [x] **P0.02-T1** Add private invite digests, redemptions, atomic throttles and audit records. Generate ≥128-bit random single-use codes, default seven-day expiry; return plaintext once. Lock membership/invite rows on redemption, enforce five attempts/hour/account plus IP throttle, and return a generic unavailable-code error.
 - [x] **P0.02-T2** Build owner invite create/copy/revoke/status and safe member summary; pending gate supports paste, retry time, sign out and account deletion. No automatic message delivery; no private note/code in analytics or logs.
-- [ ] **P0.02-T3** Configure staging Google OAuth/PKCE, exact callbacks and verified custom SMTP. Implement expired-link/resend/change-email and cross-browser recovery. Add onboarding privacy text, skip/explore, and availability-aware next actions.
+- [ ] **P0.02-T3** Configure staging email magic-link sign-in with exact callbacks and verified custom SMTP (Google OAuth/PKCE deferred by the owner decision above). Implement expired-link/resend/change-email and cross-browser recovery. Add onboarding privacy text, skip/explore, and availability-aware next actions.
 - [x] **P0.02-T4** Implement hourly pending-account cleanup after 24 hours with lock/recheck/deleting transition; failed Auth deletion stays retryable. Establish private API error mapping and idempotency envelopes for these commands.
 
 Acceptance:
 
 1. **P0.02-A1 — Integration:** Race two accounts for one code: exactly one admission and one use. Retry the winner's request: same membership, no extra use. Expired/revoked/exhausted codes fail without disclosing private notes.
 2. **P0.02-A2 — DB/integration:** The first five attempts obey the configured limit; the sixth is throttled with retry time. Parallel attempts cannot bypass the counter. Race cleanup with redemption: an admitted account is never removed.
-3. **P0.02-A3 — Staging/device:** A non-project-team invited address receives a magic link; Google and email flows both complete on the deployed host. Expired/cross-browser links give a usable recovery route.
+3. **P0.02-A3 — Staging/device:** A non-project-team invited address receives a magic link; the email flow completes on the deployed host (Google deferred by the owner decision above). Expired/cross-browser links give a usable recovery route.
 4. **P0.02-A4 — DB/E2E:** Nonowners cannot use admin endpoints; unused-code revocation does not suspend an existing member. Onboarding can be skipped without measurements, photos or notification permission.
 
 ## P0.03 — Upload and retrieve a private validated photo
@@ -98,7 +100,7 @@ Tasks:
 - [x] **P0.05-T2** Implement the internal-only AI gateway: server task aliases, counted inputs, bounded billed output/thinking, effective-dated prices, schema validation, unique attempts, and no direct worker/client provider access. Unknown price/bound/accounting state fails closed.
 - [x] **P0.05-T3** Implement uncertain dispatch holds, separately reserved explicit retry/repair, cancellation settlement, chronological period locks, rollover holds and tariff recheck before dispatch. An actual charge above reservation pauses AI and alerts.
 - [x] **P0.05-T4** Build admin spend actual/reserved/unknown/task/member summaries and deliberate revisioned threshold changes. Bootstrap/member status supplies mode and local reset time without others' usage; normal/lighter/paused/provider-error states are distinct.
-- [ ] **P0.05-T5** Verify real paid Gemini project, current approved model IDs/prices, output bounds, billing period and available cap/prepaid settings; record configuration, disable automatic top-up where supported. Add budget-mode analytics using only allowed fields. The test runner stays operator-only.
+- [ ] **P0.05-T5** Verify real paid Gemini project, current approved model IDs/prices, output bounds, billing period and available cap/prepaid settings; record configuration, disable automatic top-up where supported. The test runner stays operator-only. (Budget-mode analytics, originally part of this task, shipped under P0.07-T4; only provider verification is open.)
 
 Acceptance:
 
@@ -132,19 +134,21 @@ Acceptance:
 **Depends on:** P0.03–P0.06.  
 **Demo:** An operator detects a stopped cleanup scheduler, recovers it, then restores an isolated backup without reviving deleted data or old paid jobs.
 
+Owner decision (27 September 2026): P0.07-T2, T3 and T4 stay unchecked until their staging parts pass. Their local parts are implemented and evidenced in [evidence/P0.07.md](evidence/P0.07.md). Open: the installed external heartbeat monitor (T2), scheduled daily exports (T3), and provider resource alerts and PostHog project settings (T4).
+
 Tasks:
 
 - [x] **P0.07-T1** Create CI for contracts/types, RLS/integration/worker checks, web export and immutable worker build; staging promotion order is additive migration → compatible worker/internal → public API → web. Document artifact rollback and environment/secret inventory.
-- [x] **P0.07-T2** Implement five-minute temporary cleanup, daily orphan reconciliation and expiry checks at sign/read/callback. Measure one-hour abandoned-upload cleanup and 24-hour retained-asset deletion targets; install an independent missed-heartbeat/stuck-work alert and manual recovery command.
-- [x] **P0.07-T3** Configure encrypted daily DB exports, seven-day retention and an external minimal deletion journal. Rehearse isolated Auth/schema restore, deletion replay, expired-session purge, stale job/AI disablement and media existence reconciliation. Document 24-hour RPO/one-day restoration targets and absence of independent retained-media backup.
-- [x] **P0.07-T4** Wire allowlisted PostHog events with recording/autocapture/automatic URL capture off; scrub errors and route templates. Add redacted operational health/spend/deletion summaries and infrastructure resource alerts without a new monitoring platform.
+- [ ] **P0.07-T2** Implement five-minute temporary cleanup, daily orphan reconciliation and expiry checks at sign/read/callback. Measure one-hour abandoned-upload cleanup and 24-hour retained-asset deletion targets; install an independent missed-heartbeat/stuck-work alert and manual recovery command.
+- [ ] **P0.07-T3** Configure encrypted daily DB exports, seven-day retention and an external minimal deletion journal. Rehearse isolated Auth/schema restore, deletion replay, expired-session purge, stale job/AI disablement and media existence reconciliation. Document 24-hour RPO/one-day restoration targets and absence of independent retained-media backup.
+- [ ] **P0.07-T4** Wire allowlisted PostHog events with recording/autocapture/automatic URL capture off; scrub errors and route templates. Add redacted operational health/spend/deletion summaries and infrastructure resource alerts without a new monitoring platform.
 
 Acceptance:
 
 1. **P0.07-A1 — Integration/staging:** Missed maintenance heartbeat is detected independently of the failed scheduler. Recovery drains queued deletions; outage status does not falsely say deleted.
 2. **P0.07-A2 — Staging:** Restore fixture DB into isolation; journal prevents deleted details from becoming visible, old jobs cannot dispatch, and session access is reestablished safely. Record elapsed restoration and export age against targets.
 3. **P0.07-A3 — E2E/integration:** Inspect emitted analytics and redacted errors for forbidden fields; PostHog outage does not interrupt uploads/settings. Logout resets identity and cache.
-4. **P0.07-A4 — Staging:** Deep links and both auth callbacks work after deployment; roll back client/Edge/worker artifact with additive schema retained. No secrets appear in public bundle or logs.
+4. **P0.07-A4 — Staging:** Deep links and the email auth callback work after deployment (Google callback deferred); roll back client/Edge/worker artifact with additive schema retained. No secrets appear in public bundle or logs.
 
 ## Phase exit and rollback
 

@@ -2,7 +2,7 @@
 
 **Status:** Phases 0 and 1 are implemented on the local stack; their staging, device, paid-model and human-pilot gates remain open (unchecked tasks, recorded in each slice's evidence). Slice evidence is in [evidence/](evidence/).  
 **Prepared:** 25 September 2026.  
-**Baseline:** This repository currently contains specifications and local tooling configuration, with no application, migrations, worker, or test harness.
+**Baseline (25 September 2026):** The plan was written against a repository containing only specifications and local tooling configuration. The application, migrations, worker and test harness for phases 0 and 1 now exist (27 September 2026); open gates are tracked in the [completion plan](phase-00-01-completion-plan.md).
 
 Deliver phases 0–2 as the MVP: an invited person can privately Gather, Arrange, confirm a Strut, and use Encore. Each phase below has its own task file. Later phases extend the same ownership, media, job, budget, and deletion contracts.
 
@@ -80,7 +80,7 @@ Each phase file lists entry conditions, ordered slices, checkbox tasks, expected
 
 ## Repository work map
 
-These are future implementation locations from ARCHITECTURE §3; they do not exist yet.
+Implementation locations from ARCHITECTURE §3. All exist as of phase 1 (27 September 2026).
 
 | Location | Owned responsibility |
 | --- | --- |

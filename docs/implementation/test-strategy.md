@@ -1,6 +1,6 @@
 # Vertical-slice test and evidence strategy
 
-**Status:** Proposed test contract. No application tests exist yet.  
+**Status:** Test contract. Suites for phases 0 and 1 exist and run in CI (27 September 2026); the commands are in [AGENTS.md](../../AGENTS.md). Later phases have no tests yet.  
 **Sources:** [ARCHITECTURE §§8–12, 14–16](../../ARCHITECTURE.md), [DESIGN §§10–14](../../DESIGN.md).  
 **Navigation:** [Plan](README.md).
 
@@ -18,7 +18,7 @@
 
 Database race tests use separate transactions/connections, synchronization barriers, and deterministic assertions. Do not claim a sequential unit test proves concurrency. Fake adapters must expose call counts and controlled outcomes; E2E checks should still exercise actual server authorization and transactions. A completely mocked frontend is not slice acceptance.
 
-Phase 0 creates documented scripts for these layers, contract generation/drift checks, lint/type checks, migration reset, web export, and worker-image build. Record the actual commands once the repository is scaffolded; this plan does not pretend those commands already exist.
+Phase 0 creates documented scripts for these layers, contract generation/drift checks, lint/type checks, migration reset, web export, and worker-image build. The actual commands are recorded in [AGENTS.md](../../AGENTS.md).
 
 Run focused relevant checks while implementing. Before a phase release, run its cross-slice journey plus the shared invariants it could affect. Before MVP release, run the full MVP critical suite once against the release candidate. Repeat only after changes, failures, or unresolved concerns.
 
@@ -28,7 +28,7 @@ Run focused relevant checks while implementing. Before a phase release, run its 
 - Staging: separate Auth, R2, Modal, Gemini, analytics and callback configuration. Preview builds never point at production.
 - Production: immutable tested artifacts; feature flags off until gates pass; narrow non-billable smoke checks after deploy.
 - Never commit secrets, raw private photos, signed URLs, body measurements, invite codes, or provider payloads as test evidence. Store consenting-user evaluation images privately; commit a redacted manifest and aggregate results.
-- Paid smoke, evaluation, repair, and search calls use the gateway and a declared bounded run budget. Multiple development/staging projects do not create permission to exceed the owner's intended shared AI spend; record how evaluation spend is allocated before running paid evaluations.
+- Paid smoke, evaluation, repair, and search calls use the gateway and a declared bounded run budget. Multiple development/staging projects do not create permission to exceed the owner's intended shared AI spend; record how evaluation spend is allocated before running paid evaluations. Owner decision (27 September 2026): the US$10 ceiling applies to production; staging tests run under a separate cap, US$2 for now.
 
 ## Shared fixtures
 

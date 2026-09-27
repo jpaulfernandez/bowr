@@ -5,9 +5,9 @@ import { SkipLink } from './SkipLink';
 
 type NavItem = { href: Href; label: string; prefixes: string[] };
 
-// Only destinations that exist in this phase are shown; no disabled future tabs.
 const items: NavItem[] = [
   { href: '/wardrobe', label: 'Bower', prefixes: ['/wardrobe'] },
+  { href: '/outfits', label: 'Outfits', prefixes: ['/outfits'] },
   { href: '/more', label: 'More', prefixes: ['/more', '/settings', '/privacy', '/admin', '/onboarding', '/help'] },
 ];
 
