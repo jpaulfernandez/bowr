@@ -16,10 +16,10 @@ Use the existing upload, asset, worker, gateway and cleanup paths. Implement `it
 
 Tasks:
 
-- [ ] **P1.01-T1** Add item/asset relationships and unique upload-entry/part creation identity; implement owner-filtered paginated reads, `update_item`, field provenance, taxonomy and revision conflicts. Preserve all first-class garment/accessory categories.
-- [ ] **P1.01-T2** Connect validated uploads to one visible ordinary item and cutout/mask/thumbnail stages. Produce transparent square 1024 px cutout and 256 px thumbnail from the sanitized original; masked image work uses pinned CPU models.
-- [ ] **P1.01-T3** Build `/wardrobe`, `/wardrobe/gather`, `/wardrobe/uploads/:id`, `/wardrobe/items/:id` with stable tiles, Cutout/Original, editable name/category/colors and collapsed optional metadata. Add guide entry, take/choose photo, rotate/remove and first-upload guidance.
-- [ ] **P1.01-T4** Add Use original, retry stage, manual category and needs-attention states. Eligibility depends on resolved metadata, not all processing succeeding; no AI call is required for manual identification.
+- [x] **P1.01-T1** Add item/asset relationships and unique upload-entry/part creation identity; implement owner-filtered paginated reads, `update_item`, field provenance, taxonomy and revision conflicts. Preserve all first-class garment/accessory categories.
+- [x] **P1.01-T2** Connect validated uploads to one visible ordinary item and cutout/mask/thumbnail stages. Produce transparent square 1024 px cutout and 256 px thumbnail from the sanitized original; masked image work uses pinned CPU models.
+- [x] **P1.01-T3** Build `/wardrobe`, `/wardrobe/gather`, `/wardrobe/uploads/:id`, `/wardrobe/items/:id` with stable tiles, Cutout/Original, editable name/category/colors and collapsed optional metadata. Add guide entry, take/choose photo, rotate/remove and first-upload guidance.
+- [x] **P1.01-T4** Add Use original, retry stage, manual category and needs-attention states. Eligibility depends on resolved metadata, not all processing succeeding; no AI call is required for manual identification.
 
 Acceptance:
 
@@ -36,9 +36,9 @@ Acceptance:
 Tasks:
 
 - [ ] **P1.02-T1** Implement independent foreground-color, normalized 512-dimensional FashionCLIP and guarded structured-tag stages. Version model/preprocess/media/prompt/schema identities; reject incompatible vector spaces. Include shoe, eyewear, headwear and accessory attributes.
-- [ ] **P1.02-T2** Persist bounded suggestions separately; apply only unchanged, unlocked field versions from the current media revision. User-cleared values remain locked. Offer explicit Use suggestion; mark inferred material and uncertain category honestly.
-- [ ] **P1.02-T3** Validate category/subcategory/formality/seasons/tags and output size at worker/API/DB boundaries. Build owner-filtered exact vector retrieval for later matching; no approximate index or new vector service.
-- [ ] **P1.02-T4** Expose processing/review states and explicit retry. Resolve safe retained-item blocked tagging after budget reset, but never regenerate on page open or retry ambiguous billed calls automatically.
+- [x] **P1.02-T2** Persist bounded suggestions separately; apply only unchanged, unlocked field versions from the current media revision. User-cleared values remain locked. Offer explicit Use suggestion; mark inferred material and uncertain category honestly.
+- [x] **P1.02-T3** Validate category/subcategory/formality/seasons/tags and output size at worker/API/DB boundaries. Build owner-filtered exact vector retrieval for later matching; no approximate index or new vector service.
+- [x] **P1.02-T4** Expose processing/review states and explicit retry. Resolve safe retained-item blocked tagging after budget reset, but never regenerate on page open or retry ambiguous billed calls automatically.
 
 Acceptance:
 
@@ -54,10 +54,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P1.03-T1** Expand the Gather queue to 20 source photos including labels, three concurrent uploads, thumbnail rotate/remove/add, per-file progress and uploaded-versus-unsent distinction. Desktop drop is optional beside file input.
-- [ ] **P1.03-T2** Implement optional care-label attachment to a selected queue garment or existing item, independent label reading and editable brand/size/material. A label never creates another wardrobe piece.
-- [ ] **P1.03-T3** Deliver `/help/photos` with hanger/flat-lay and shoe, shades, hat, bag, belt, watch/jewelry guidance from the PRD. Make guidance reopenable and category-specific; no native framing outline until phase 8.
-- [ ] **P1.03-T4** Add batch review and needs-attention filtering; successful ordinary tags do not need mandatory approval. Resume uploaded work by batch ID; retry only failed entries and keep stable source identities.
+- [x] **P1.03-T1** Expand the Gather queue to 20 source photos including labels, three concurrent uploads, thumbnail rotate/remove/add, per-file progress and uploaded-versus-unsent distinction. Desktop drop is optional beside file input.
+- [x] **P1.03-T2** Implement optional care-label attachment to a selected queue garment or existing item, independent label reading and editable brand/size/material. A label never creates another wardrobe piece.
+- [x] **P1.03-T3** Deliver `/help/photos` with hanger/flat-lay and shoe, shades, hat, bag, belt, watch/jewelry guidance from the PRD. Make guidance reopenable and category-specific; no native framing outline until phase 8.
+- [x] **P1.03-T4** Add batch review and needs-attention filtering; successful ordinary tags do not need mandatory approval. Resume uploaded work by batch ID; retry only failed entries and keep stable source identities.
 
 Acceptance:
 
@@ -73,10 +73,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P1.04-T1** Add grouped-photo choice and crop proposals/manual rectangles. Require Keep as one set or explicit selected parts; validate normalized oriented coordinates and maximum 20 parts/source. No automatic multi-item creation.
-- [ ] **P1.04-T2** Implement `confirm-parts` atomically with stable source-part IDs, independent normalized item crops and jobs. Shared grouped original stays temporary; confirmed item assets get independent lifecycle.
-- [ ] **P1.04-T3** Add same-owner sanitized hash and category/vector duplicate comparisons, with Use existing, Add another, Decide later. Delay creating a second item when a duplicate decision is pending; intentional identical garments remain distinct.
-- [ ] **P1.04-T4** Support manual crops/keep-one with AI paused; retain label-to-item assignment and clean rejected crops/source media through the existing deletion service.
+- [x] **P1.04-T1** Add grouped-photo choice and crop proposals/manual rectangles. Require Keep as one set or explicit selected parts; validate normalized oriented coordinates and maximum 20 parts/source. No automatic multi-item creation.
+- [x] **P1.04-T2** Implement `confirm-parts` atomically with stable source-part IDs, independent normalized item crops and jobs. Shared grouped original stays temporary; confirmed item assets get independent lifecycle.
+- [x] **P1.04-T3** Add same-owner sanitized hash and category/vector duplicate comparisons, with Use existing, Add another, Decide later. Delay creating a second item when a duplicate decision is pending; intentional identical garments remain distinct.
+- [x] **P1.04-T4** Support manual crops/keep-one with AI paused; retain label-to-item assignment and clean rejected crops/source media through the existing deletion service.
 
 Acceptance:
 
@@ -92,9 +92,9 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P1.05-T1** Build web mask-editor adapter with Restore/Erase, brush size, zoom, undo/reset and explicit accessible alternatives. Keep Use original and alternate-model retry available when brushing is impractical.
-- [ ] **P1.05-T2** Submit mask assets tied to original/media revision; validate dimensions and compose server-side. Increment media revision for accepted mask/crop/replacement and recompute affected thumbnails/colors/embeddings.
-- [ ] **P1.05-T3** Implement replace/reshoot on the existing item ID, with safe pending publication and cleanup of superseded unreferenced assets. Preserve user metadata and source/history relationships.
+- [x] **P1.05-T1** Build web mask-editor adapter with Restore/Erase, brush size, zoom, undo/reset and explicit accessible alternatives. Keep Use original and alternate-model retry available when brushing is impractical.
+- [x] **P1.05-T2** Submit mask assets tied to original/media revision; validate dimensions and compose server-side. Increment media revision for accepted mask/crop/replacement and recompute affected thumbnails/colors/embeddings.
+- [x] **P1.05-T3** Implement replace/reshoot on the existing item ID, with safe pending publication and cleanup of superseded unreferenced assets. Preserve user metadata and source/history relationships.
 
 Acceptance:
 
@@ -110,10 +110,10 @@ Acceptance:
 
 Tasks:
 
-- [ ] **P1.06-T1** Implement text/tag/synonym search, OR within facets and AND across facets, stable cursor pagination, recently-added/category/color/name sorting and active filter chips. Preserve filters/scroll on detail/back. Add 50/300-item fixtures and lazy thumbnails.
-- [ ] **P1.06-T2** Implement accessible visible bulk Select, up-to-100 revisioned category/archive operations, lifecycle restore and counts excluding archived/deleted with processing reported separately. Never silently skip stale selected rows.
-- [ ] **P1.06-T3** Implement permanent item deletion: neutral tombstone, reusable attributes/vectors/suggestions scrubbed, attached original/cutout/thumbnail/mask/labels queued for deletion, late jobs fenced. Extend the lifecycle registry as later referencing domains are added.
-- [ ] **P1.06-T4** Expose empty/no-results/image-error/archive states and explicit delete consequences; no wear statistics before phase 2. Emit safe item-added/reviewed/upload events after the relevant successful action.
+- [x] **P1.06-T1** Implement text/tag/synonym search, OR within facets and AND across facets, stable cursor pagination, recently-added/category/color/name sorting and active filter chips. Preserve filters/scroll on detail/back. Add 50/300-item fixtures and lazy thumbnails.
+- [x] **P1.06-T2** Implement accessible visible bulk Select, up-to-100 revisioned category/archive operations, lifecycle restore and counts excluding archived/deleted with processing reported separately. Never silently skip stale selected rows.
+- [x] **P1.06-T3** Implement permanent item deletion: neutral tombstone, reusable attributes/vectors/suggestions scrubbed, attached original/cutout/thumbnail/mask/labels queued for deletion, late jobs fenced. Extend the lifecycle registry as later referencing domains are added.
+- [x] **P1.06-T4** Expose empty/no-results/image-error/archive states and explicit delete consequences; no wear statistics before phase 2. Emit safe item-added/reviewed/upload events after the relevant successful action.
 
 Acceptance:
 

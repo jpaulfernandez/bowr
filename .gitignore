@@ -25,3 +25,5 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 apps/app/.vercel/
+# Pinned worker model weights (fetched with `pnpm worker:models`)
+services/worker/models/

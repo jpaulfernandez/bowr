@@ -13,6 +13,7 @@ import { createIdentity } from '../../../tests/support/identities';
 import { startDeletion } from '../../../tests/support/lifecycle';
 import { createSlot, mediaFixtures, putSlot } from '../../../tests/support/media';
 import { sql, stack } from '../../../tests/support/stack';
+import { settleItemStages } from '../../../tests/support/jobs';
 
 afterAll(async () => {
   await sql().end();
@@ -34,6 +35,7 @@ it('P0.07 demo: a deletion-aware restore into isolation', async () => {
     { timeout: 20_000 }).toBe('ready');
   const waiting = await createSlot(keeperToken, fixtures.png, 'image/png');
   await putSlot(waiting.entry, fixtures.png);
+  await settleItemStages();
   await sql()`select public.svc_complete_upload_entry(${keeper.id}, ${randomUUID()}, ${waiting.entry.entry_id}, ${fixtures.png.length})`;
   // An AI attempt reserved but not yet settled when the export is taken.
   const attemptKey = `restore:${randomUUID()}`;

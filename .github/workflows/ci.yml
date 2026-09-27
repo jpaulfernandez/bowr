@@ -32,6 +32,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: uv sync --frozen
         working-directory: services/worker
+      # Pinned cutout weights, verified against config/models.yaml checksums.
+      - uses: actions/cache@v4
+        with:
+          path: services/worker/models
+          key: worker-models-${{ hashFiles('config/models.yaml') }}
+      - run: pnpm worker:models
       # Includes the generated-contract drift check (pnpm test:unit).
       - run: pnpm check
 
@@ -51,6 +57,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: uv sync --frozen
         working-directory: services/worker
+      - uses: actions/cache@v4
+        with:
+          path: services/worker/models
+          key: worker-models-${{ hashFiles('config/models.yaml') }}
+      - run: pnpm worker:models
       - name: Local-only environment files
         run: |
           cp supabase/functions/.env.example supabase/functions/.env

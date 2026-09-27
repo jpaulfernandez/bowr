@@ -42,6 +42,8 @@ describe('decideRoute', () => {
 
   it('lets a new member open onboarding', () => {
     expect(decideRoute('/onboarding', member)).toEqual({ type: 'allow' });
+    expect(decideRoute('/help/photos', member)).toEqual({ type: 'allow' });
+    expect(decideRoute('/help/photos', pending)).toEqual({ type: 'redirect', to: '/invite' });
     expect(decideRoute('/onboarding', pending)).toEqual({ type: 'redirect', to: '/invite' });
   });
 

@@ -58,3 +58,25 @@ export async function createSlot(token: string, bytes: Buffer, contentType: stri
 export async function putSlot(entry: { upload: { url: string; headers: Record<string, string> } }, bytes: Buffer) {
   return fetch(entry.upload.url, { method: 'PUT', headers: entry.upload.headers, body: bytes });
 }
+
+/**
+ * WARDROBE photo fixtures, generated synthetically by the worker's helpers:
+ * a shirt and trousers on a plain background, a care label, grouped accessories (a watch and a
+ * bracelet; a pair of earrings) on dark fabric, and a blank photo in which no garment can be found. No real photos are committed.
+ */
+export function wardrobeFixtures(): Record<'garment' | 'trousers' | 'label' | 'accessories' | 'earrings' | 'blank', Buffer> {
+  const script = `
+import base64, json
+from PIL import Image
+from tests.conftest import accessories, care_label, earrings, encode, garment, trousers
+print(json.dumps({k: base64.b64encode(v).decode() for k, v in {
+  "garment": encode(garment(), "PNG"),
+  "trousers": encode(trousers(), "PNG"),
+  "label": encode(care_label(), "PNG"),
+  "accessories": encode(accessories(), "PNG"),
+  "earrings": encode(earrings(), "PNG"),
+  "blank": encode(Image.new("RGB", (640, 480), (200, 200, 200)), "PNG"),
+}.items()}))`;
+  const output = execFileSync('uv', ['run', 'python', '-c', script], { cwd: 'services/worker', encoding: 'utf8' });
+  return Object.fromEntries(Object.entries(JSON.parse(output)).map(([k, v]) => [k, Buffer.from(v as string, 'base64')])) as never;
+}

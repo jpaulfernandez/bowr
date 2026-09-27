@@ -9,7 +9,8 @@ export function RadioGroup<T extends string>({
   onChange,
 }: {
   label: string;
-  value: T;
+  /** Null when nothing is chosen yet. */
+  value: T | null;
   options: Array<Option<T>>;
   onChange: (value: T) => void;
 }) {

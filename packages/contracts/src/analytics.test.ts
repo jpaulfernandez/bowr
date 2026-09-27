@@ -14,6 +14,8 @@ describe('AnalyticsEvent', () => {
   it('accepts only allowlisted events with bounded properties', () => {
     expect(AnalyticsEvent.safeParse({ event: 'upload_started', properties: { files: 3 } }).success).toBe(true);
     expect(AnalyticsEvent.safeParse({ event: 'item_photo', properties: {} }).success).toBe(false);
+    expect(AnalyticsEvent.safeParse({ event: 'item_added', properties: { source: 'group' } }).success).toBe(true);
+    expect(AnalyticsEvent.safeParse({ event: 'item_reviewed', properties: { category: 'eyewear' } }).success).toBe(true);
   });
 
   it('rejects free text, emails, URLs and extra fields', () => {
@@ -23,6 +25,10 @@ describe('AnalyticsEvent', () => {
       { event: 'client_error', properties: { code: 'UNEXPECTED', route: '/wardrobe/uploads/123' } },
       { event: 'upload_failed', properties: { code: 'NETWORK', format: 'png', name: 'me@example.test.png' } },
       { event: 'screen_viewed', properties: { route: '/', $current_url: 'https://bowr.app/?code=1' } },
+      { event: 'item_added', properties: { source: 'upload', name: 'My secret shirt' } },
+      { event: 'item_added', properties: { source: 'https://example.test/photo.png' } },
+      { event: 'item_reviewed', properties: { category: 'tops', item_id: '5f0c7f1e-8a61-4f0a-9d9b-2b0f5d5c1a11' } },
+      { event: 'item_reviewed', properties: { category: 'Navy linen shirt' } },
     ];
     for (const event of rejected) expect(AnalyticsEvent.safeParse(event).success).toBe(false);
   });

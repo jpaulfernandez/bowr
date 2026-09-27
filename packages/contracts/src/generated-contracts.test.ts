@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { parse } from 'yaml';
+import { namedColors, taxonomyDocument } from '@bowr/domain';
 import { ModelManifest } from './model-manifest';
 import { workerJsonSchemas } from './worker';
 
@@ -26,6 +27,15 @@ describe('generated worker contracts', () => {
 const catalogPath = fileURLToPath(new URL('../../../supabase/functions/_shared/generated/ai-catalog.json', import.meta.url));
 const manifestPath = fileURLToPath(new URL('../../../config/models.yaml', import.meta.url));
 
+describe('generated local model manifest', () => {
+  it('local_models.json matches config/models.yaml', () => {
+    const manifest = ModelManifest.parse(parse(readFileSync(manifestPath, 'utf8')));
+    const generated = `${JSON.stringify(manifest.local_models, null, 2)}\n`;
+    if (process.env.UPDATE_CONTRACTS === '1') writeFileSync(`${outDir}local_models.json`, generated);
+    expect(readFileSync(`${outDir}local_models.json`, 'utf8')).toBe(generated);
+  });
+});
+
 describe('generated AI catalog', () => {
   it('ai-catalog.json matches config/models.yaml', () => {
     const manifest = ModelManifest.parse(parse(readFileSync(manifestPath, 'utf8')));
@@ -35,5 +45,23 @@ describe('generated AI catalog', () => {
       writeFileSync(catalogPath, generated);
     }
     expect(readFileSync(catalogPath, 'utf8')).toBe(generated);
+  });
+});
+
+const taxonomyPath = fileURLToPath(new URL('../../../supabase/functions/_shared/generated/taxonomy.json', import.meta.url));
+
+describe('generated taxonomy', () => {
+  it('taxonomy.json matches packages/domain', () => {
+    const generated = `${JSON.stringify(taxonomyDocument(), null, 2)}\n`;
+    if (process.env.UPDATE_CONTRACTS === '1') writeFileSync(taxonomyPath, generated);
+    expect(readFileSync(taxonomyPath, 'utf8')).toBe(generated);
+  });
+});
+
+describe('generated color palette', () => {
+  it('palette.json (named colors with hex) matches packages/domain', () => {
+    const generated = `${JSON.stringify(namedColors, null, 2)}\n`;
+    if (process.env.UPDATE_CONTRACTS === '1') writeFileSync(`${outDir}palette.json`, generated);
+    expect(readFileSync(`${outDir}palette.json`, 'utf8')).toBe(generated);
   });
 });

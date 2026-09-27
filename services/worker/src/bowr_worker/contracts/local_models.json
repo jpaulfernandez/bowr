@@ -1,0 +1,14 @@
+{
+  "isnet_general_use": {
+    "source": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx",
+    "revision": "rembg-v0.0.0",
+    "sha256": "60920e99c45464f2ba57bee2ad08c919a52bbf852739e96947fbb4358c0d964a",
+    "license": "Apache-2.0 (upstream DIS/IS-Net; ONNX export published by rembg, MIT)"
+  },
+  "u2netp": {
+    "source": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx",
+    "revision": "rembg-v0.0.0",
+    "sha256": "309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8",
+    "license": "Apache-2.0 (upstream U-2-Net; ONNX export published by rembg, MIT)"
+  }
+}

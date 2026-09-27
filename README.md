@@ -15,6 +15,7 @@ Prerequisites: Node 22 (`.nvmrc`), pnpm 10, [uv](https://docs.astral.sh/uv/), an
 ```sh
 pnpm install
 (cd services/worker && uv sync)
+pnpm worker:models           # pinned cutout weights (checksums in config/models.yaml)
 
 # Local Supabase: Postgres, Auth, Edge runtime and Mailpit for sign-in emails.
 cp supabase/functions/.env.example supabase/functions/.env

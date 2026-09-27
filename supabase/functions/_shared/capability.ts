@@ -1,12 +1,14 @@
 // Short-lived, job-scoped capabilities for the worker. They authorize exactly one
-// job, lease generation and output key; they are not user credentials.
+// job, lease generation and set of output keys; they are not user credentials.
 export type JobCapability = {
   job_id: string;
   user_id: string;
-  asset_id: string;
-  stage: 'validate_upload';
+  /** Validation: the upload's asset. Item stages: the item. */
+  target_id: string;
+  stage: 'validate_upload' | 'crop' | 'cutout' | 'colors' | 'embedding' | 'tags' | 'label';
   lease_generation: number;
-  output_key: string;
+  /** Rendition name -> server-chosen object key. */
+  output_keys: Record<string, string>;
   exp: number;
 };
 

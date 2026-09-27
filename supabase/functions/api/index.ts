@@ -3,11 +3,12 @@ import { aiEnabled, runDiagnostic } from '../_shared/ai-gateway.ts';
 import { requireCaller } from '../_shared/auth.ts';
 import { appError, errorResponse, fromDatabaseError, json, preflight } from '../_shared/http.ts';
 import { sha256Hex } from '../_shared/capability.ts';
-import { afterResponse, dispatchJob } from '../_shared/dispatch.ts';
-import { processAccountDeletions } from '../_shared/lifecycle.ts';
+import { afterResponse, dispatchJob, dispatchRunnable } from '../_shared/dispatch.ts';
+import { processAccountDeletions, processMediaDeletion } from '../_shared/lifecycle.ts';
 import { clientIpHash, generateInviteCode, inviteDigest } from '../_shared/invite-codes.ts';
 import { serviceClient } from '../_shared/service.ts';
-import { bucketName, headObject, presignGet, presignPut } from '../_shared/storage.ts';
+import { imageInfo } from '../_shared/image-bytes.ts';
+import { bucketName, deleteObject, headObject, presignGet, presignPut, putObject } from '../_shared/storage.ts';
 import { idempotencyKey, isUuid, jsonBody } from '../_shared/validate.ts';
 
 type Context = { req: Request; requestId: string; params: string[] };
@@ -89,9 +90,13 @@ route('POST', /^\/v1\/upload-batches$/, async ({ req, requestId }) => {
   const files = body.files.map((file: unknown) => {
     const f = (file ?? {}) as Record<string, unknown>;
     const unexpected = Object.keys(f).filter((k) =>
-      !['client_file_id', 'purpose', 'content_type', 'byte_size', 'rotation'].includes(k)
+      !['client_file_id', 'purpose', 'content_type', 'byte_size', 'rotation', 'label_for', 'target_item_id'].includes(k)
     );
-    if (unexpected.length > 0 || !isUuid(f.client_file_id)) {
+    if (
+      unexpected.length > 0 || !isUuid(f.client_file_id) ||
+      (f.label_for !== undefined && !isUuid(f.label_for)) ||
+      (f.target_item_id !== undefined && !isUuid(f.target_item_id))
+    ) {
       throw appError(422, 'VALIDATION_FAILED', {
         field: 'files',
         reason: unexpected.length > 0 ? 'unexpected_fields' : 'client_file_id',
@@ -106,6 +111,9 @@ route('POST', /^\/v1\/upload-batches$/, async ({ req, requestId }) => {
       content_type: f.content_type,
       byte_size: f.byte_size,
       rotation: f.rotation ?? 0,
+      // A care label names its garment in this batch or an existing piece.
+      ...(f.label_for !== undefined ? { label_for: String(f.label_for).toLowerCase() } : {}),
+      ...(f.target_item_id !== undefined ? { target_item_id: String(f.target_item_id).toLowerCase() } : {}),
     };
   });
   const batch = (await callService('svc_create_upload_batch', {
@@ -194,6 +202,167 @@ route('GET', /^\/v1\/upload-entries\/([^/]+)\/status$/, async ({ req, requestId,
     200,
     await callService('svc_entry_job_status', { p_user_id: userId, p_entry_id: params[0] }),
   );
+});
+
+// Keep a grouped photo as one set, or confirm the parts to become pieces.
+route('POST', /^\/v1\/upload-entries\/([^/]+)\/confirm-parts$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  const key = idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  const body = await jsonBody(req, ['mode', 'image', 'parts']);
+  const result = (await callService('svc_confirm_parts', {
+    p_user_id: userId,
+    p_request_id: key,
+    p_entry_id: params[0],
+    p_mode: body.mode ?? null,
+    p_image: body.image ?? null,
+    p_parts: body.parts ?? null,
+  })) as { items: Array<{ job_id: string }> };
+  for (const item of result.items) afterResponse(dispatchJob(item.job_id));
+  return json(req, requestId, 200, result);
+});
+
+// Use existing / Add another for a possible duplicate. Decide later needs no call.
+route('POST', /^\/v1\/duplicate-reviews\/([^/]+)\/resolve$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  const key = idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  const body = await jsonBody(req, ['decision']);
+  const result = await callService('svc_resolve_duplicate', {
+    p_user_id: userId,
+    p_request_id: key,
+    p_review_id: params[0],
+    p_decision: body.decision ?? null,
+  });
+  // A new piece or a moved label queues stages; removed media is deleted.
+  afterResponse(dispatchRunnable(5));
+  afterResponse(processMediaDeletion());
+  return json(req, requestId, 200, result);
+});
+
+// --- Items -------------------------------------------------------------------
+
+const ITEM_STAGES = ['crop', 'cutout', 'colors', 'embedding', 'tags', 'label'];
+
+// Owner retries a failed or interrupted stage for the item's current media revision.
+route('POST', /^\/v1\/items\/([^/]+)\/process$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  const body = await jsonBody(req, ['stage', 'media_revision']);
+  if (typeof body.stage !== 'string' || !ITEM_STAGES.includes(body.stage)) {
+    throw appError(422, 'VALIDATION_FAILED', { field: 'stage' });
+  }
+  if (!Number.isSafeInteger(body.media_revision)) throw appError(422, 'VALIDATION_FAILED', { field: 'media_revision' });
+  const result = (await callService('svc_retry_item_stage', {
+    p_user_id: userId,
+    p_item_id: params[0],
+    p_stage: body.stage,
+    p_media_revision: body.media_revision,
+  })) as { job_id: string };
+  afterResponse(dispatchJob(result.job_id));
+  return json(req, requestId, 202, { ...result, poll_after_ms: 2000 });
+});
+
+// A member-edited mask (P1.05): a PNG exactly the size of the piece's original.
+// Only the mask is accepted; the cutout is composed on the server from the
+// stored original, so no client-made cutout is ever published.
+const MAX_MASK_BYTES = 4 * 1024 * 1024;
+route('POST', /^\/v1\/items\/([^/]+)\/mask$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  const key = idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  const revision = Number(new URL(req.url).searchParams.get('media_revision'));
+  if (!Number.isSafeInteger(revision)) throw appError(422, 'VALIDATION_FAILED', { field: 'media_revision' });
+  if (req.headers.get('Content-Type') !== 'image/png') throw appError(422, 'MASK_REJECTED');
+  const bytes = new Uint8Array(await req.arrayBuffer());
+  const info = imageInfo(bytes);
+  if (bytes.byteLength < 1 || bytes.byteLength > MAX_MASK_BYTES || info?.contentType !== 'image/png') {
+    throw appError(422, 'MASK_REJECTED');
+  }
+  const objectKey = `users/${userId}/items/${params[0]}/edits/${crypto.randomUUID()}.png`;
+  await putObject(objectKey, bytes, 'image/png');
+  let result: { job_id: string };
+  try {
+    result = (await callService('svc_submit_mask', {
+      p_user_id: userId,
+      p_request_id: key,
+      p_item_id: params[0],
+      p_media_revision: revision,
+      p_bucket: bucketName(),
+      p_object_key: objectKey,
+      p_width: info.width,
+      p_height: info.height,
+      p_byte_size: bytes.byteLength,
+      p_sha256: await sha256Hex(bytes),
+    })) as { job_id: string };
+  } catch (error) {
+    // Nothing recorded it; an interrupted delete is caught by reconciliation.
+    afterResponse(deleteObject(objectKey));
+    throw error;
+  }
+  afterResponse(dispatchJob(result.job_id));
+  return json(req, requestId, 202, { ...result, poll_after_ms: 2000 });
+});
+
+// An explicit cutout with another pinned model; bounded and never automatic.
+route('POST', /^\/v1\/items\/([^/]+)\/recut$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  const key = idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  const body = await jsonBody(req, ['media_revision', 'model']);
+  if (!Number.isSafeInteger(body.media_revision)) throw appError(422, 'VALIDATION_FAILED', { field: 'media_revision' });
+  const result = (await callService('svc_recut_item', {
+    p_user_id: userId,
+    p_request_id: key,
+    p_item_id: params[0],
+    p_media_revision: body.media_revision,
+    p_model: typeof body.model === 'string' ? body.model : null,
+  })) as { job_id: string };
+  afterResponse(dispatchJob(result.job_id));
+  return json(req, requestId, 202, { ...result, poll_after_ms: 2000 });
+});
+
+// Permanently deletes a piece at the revision the member saw. Access to its
+// images ends at once; the deletion service then removes their bytes.
+route('DELETE', /^\/v1\/items\/([^/]+)$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  const key = idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  const body = await jsonBody(req, ['expected_revision']);
+  if (!Number.isSafeInteger(body.expected_revision)) {
+    throw appError(422, 'VALIDATION_FAILED', { field: 'expected_revision' });
+  }
+  const result = await callService('svc_delete_item', {
+    p_user_id: userId,
+    p_request_id: key,
+    p_item_id: params[0],
+    p_expected_revision: body.expected_revision,
+  });
+  afterResponse(processMediaDeletion());
+  return json(req, requestId, 200, result);
+});
+
+// Whether a deleted piece's images are confirmed gone ("deletion_pending" until then).
+route('GET', /^\/v1\/items\/([^/]+)\/deletion$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  return json(
+    req,
+    requestId,
+    200,
+    await callService('svc_item_deletion_status', { p_user_id: userId, p_item_id: params[0] }),
+  );
+});
+
+// Removes a care-label attachment; the piece and its values stay.
+route('DELETE', /^\/v1\/media\/([^/]+)$/, async ({ req, requestId, params }) => {
+  const { userId } = await requireCaller(req);
+  idempotencyKey(req);
+  if (!isUuid(params[0])) throw appError(404, 'NOT_FOUND');
+  const result = await callService('svc_remove_label', { p_user_id: userId, p_asset_id: params[0] });
+  afterResponse(processMediaDeletion());
+  return json(req, requestId, 200, result);
 });
 
 route('POST', /^\/v1\/media\/access$/, async ({ req, requestId }) => {

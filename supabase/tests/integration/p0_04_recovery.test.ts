@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { api, maintenance } from '../../../tests/support/api';
 import { createIdentity } from '../../../tests/support/identities';
 import { createSlot, mediaFixtures, member, putSlot, sha256, type Member } from '../../../tests/support/media';
+import { issueClaimWhenFree, settleItemStages } from '../../../tests/support/jobs';
 import { sql, stack } from '../../../tests/support/stack';
 
 const CAPABILITY_SECRET = 'local-only-worker-capability-secret-0123456789';
@@ -37,6 +38,7 @@ async function undispatchedJob(bytes = fixtures.png, type = 'image/png') {
   const { entry } = await createSlot(owner.token, bytes, type);
   cleanup.push(entry.entry_id);
   expect((await putSlot(entry, bytes)).status).toBe(200);
+  await settleItemStages();
   const [row] = await sql()`select public.svc_complete_upload_entry(${owner.id}, ${randomUUID()}, ${entry.entry_id}, ${bytes.length}) as r`;
   return { entryId: entry.entry_id as string, assetId: entry.asset_id as string, jobId: row!.r.job_id as string };
 }
@@ -44,8 +46,7 @@ async function undispatchedJob(bytes = fixtures.png, type = 'image/png') {
 /** The harness acts as a worker: issue a claim and exchange it. */
 async function harnessClaim(jobId: string) {
   const token = randomBytes(32).toString('hex');
-  const [{ issued }] = await sql()`select public.svc_issue_job_claim(${jobId}, ${sha256(Buffer.from(token))}) as issued`;
-  expect(issued).toBe(true);
+  expect(await issueClaimWhenFree(jobId, sha256(Buffer.from(token)))).toBe(true);
   const response = await fetch(internal('/jobs/claim'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -186,10 +187,10 @@ describe('P0.04-A2: duplicate delivery and scoped internal authority', () => {
     const base = {
       job_id: jobId,
       user_id: owner.id,
-      asset_id: assetId,
+      target_id: assetId,
       stage: 'validate_upload',
       lease_generation: 1,
-      output_key: `users/${owner.id}/assets/${assetId}/1/original-g1.webp`,
+      output_keys: { original: `users/${owner.id}/assets/${assetId}/1/original-g1.webp` },
       exp: Math.floor(Date.now() / 1000) + 60,
     };
     const beat = { schema_version: 1, lease_generation: 1 };
@@ -205,7 +206,7 @@ describe('P0.04-A2: duplicate delivery and scoped internal authority', () => {
       expect((await internalCall(`/jobs/${jobId}/heartbeat`, capability, beat)).status).toBe(403);
     }
     // A capability naming another asset's key cannot publish into this job.
-    const wrongAsset = forgeCapability({ ...base, output_key: `users/${owner.id}/assets/${other.assetId}/1/original-g1.webp` });
+    const wrongAsset = forgeCapability({ ...base, output_keys: { original: `users/${owner.id}/assets/${other.assetId}/1/original-g1.webp` } });
     await fetch(job.output.url.replace(assetId, other.assetId), { method: 'PUT', headers: { 'Content-Type': 'image/webp' }, body: fixtures.webp });
     const hijack = await internalCall(`/jobs/${jobId}/complete`, wrongAsset, {
       schema_version: 1,

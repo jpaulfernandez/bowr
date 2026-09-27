@@ -132,6 +132,11 @@ describe('P0.07-T2: temporary cleanup and reconciliation', () => {
     const run = await maintenance('temporary_cleanup');
     expect(run.status).toBe(200);
     expect(run.body.data.uploads_expired).toBeGreaterThanOrEqual(1);
+    // Each run deletes at most 100 due objects, oldest first; earlier suites can leave
+    // a larger backlog, which later runs drain. The deadline check below still holds.
+    for (let i = 0; i < 10 && (await storage.exists(object!.object_key)); i += 1) {
+      expect((await maintenance('temporary_cleanup')).status).toBe(200);
+    }
 
     const [row] = await sql()`select e.state, a.state as asset_state from public.upload_entries e
       join public.media_assets a on a.id = e.asset_id where e.id = ${entry.entry_id}`;
@@ -171,7 +176,8 @@ describe('P0.07-T2: temporary cleanup and reconciliation', () => {
         ${[orphanKey, live!.object_key]}::text[], now()) as r`;
       expect(r.orphans_queued).toBe(1);
       expect(r.originals_missing).toBeGreaterThanOrEqual(1);
-      await maintenance('media_deletion');
+      // At most 100 due objects per run, oldest first: drain any backlog ahead of the orphan.
+      for (let i = 0; i < 10 && (await storage.exists(orphanKey)); i += 1) await maintenance('media_deletion');
       expect(await storage.exists(orphanKey)).toBe(false);
     } finally {
       await sql()`update private.media_objects set deleted_at = now() where object_key = ${missingKey}`;

@@ -7,6 +7,7 @@ import { supabase } from './supabase';
 type RequestOptions<T extends z.ZodType> = {
   schema: T;
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  /** JSON-encoded, except a Blob, which is sent as-is with its own type. */
   body?: unknown;
   signal?: AbortSignal;
   idempotencyKey?: string;
@@ -36,7 +37,8 @@ export async function apiRequest<T extends z.ZodType>(
     Authorization: `Bearer ${token}`,
     apikey: env.supabasePublishableKey,
   };
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const raw = typeof Blob !== 'undefined' && body instanceof Blob;
+  if (body !== undefined) headers['Content-Type'] = raw ? body.type : 'application/json';
   if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
 
   let response: Response;
@@ -45,7 +47,7 @@ export async function apiRequest<T extends z.ZodType>(
       method,
       headers,
       signal: signal ?? null,
-      body: body === undefined ? null : JSON.stringify(body),
+      body: body === undefined ? null : raw ? body : JSON.stringify(body),
     });
   } catch (error) {
     assertSameAccount(userId);

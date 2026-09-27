@@ -61,3 +61,86 @@ def webp_chunks(data: bytes) -> list[str]:
         chunks.append(name)
         offset += 8 + size + (size % 2)
     return chunks
+
+
+def garment(
+    width: int = 800, height: int = 600, background: tuple[int, int, int] = (232, 229, 222)
+) -> Image.Image:
+    """A navy shirt silhouette on a plain light background (a hanger-style photo)."""
+    from PIL import ImageDraw
+
+    image = Image.new("RGB", (width, height), background)
+    sx, sy = width / 800, height / 600
+    points = [
+        (300, 110),
+        (500, 110),
+        (600, 200),
+        (555, 250),
+        (500, 215),
+        (500, 520),
+        (300, 520),
+        (300, 215),
+        (245, 250),
+        (200, 200),
+    ]
+    ImageDraw.Draw(image).polygon([(x * sx, y * sy) for x, y in points], fill=(31, 42, 77))
+    return image
+
+
+def garment_truth(width: int = 800, height: int = 600) -> list[list[bool]]:
+    """Pixel truth for ``garment()``: True where the shirt is."""
+    import numpy as np
+
+    pixels = np.asarray(garment(width, height)).astype(int)
+    return (pixels[:, :, 0] < 100) & (pixels[:, :, 2] > 60)
+
+
+def trousers(width: int = 800, height: int = 600) -> Image.Image:
+    """Brown trousers on a plain light background: a second, distinguishable piece."""
+    from PIL import ImageDraw
+
+    image = Image.new("RGB", (width, height), (232, 229, 222))
+    sx, sy = width / 800, height / 600
+    points = [(320, 80), (480, 80), (500, 540), (420, 540), (400, 250), (380, 540), (300, 540)]
+    ImageDraw.Draw(image).polygon([(x * sx, y * sy) for x, y in points], fill=(110, 75, 50))
+    return image
+
+
+def accessories(width: int = 800, height: int = 600) -> Image.Image:
+    """A gold watch and a silver bracelet, well apart, on dark fabric (a grouped photo)."""
+    from PIL import ImageDraw
+
+    image = Image.new("RGB", (width, height), (38, 36, 40))
+    draw = ImageDraw.Draw(image)
+    sx, sy = width / 800, height / 600
+    draw.rectangle((150 * sx, 120 * sy, 200 * sx, 480 * sy), fill=(120, 84, 40))
+    draw.ellipse((115 * sx, 245 * sy, 235 * sx, 355 * sy), fill=(214, 178, 92))
+    draw.ellipse((470 * sx, 190 * sy, 690 * sx, 410 * sy), outline=(205, 205, 210), width=round(24 * sx))
+    return image
+
+
+def earrings(width: int = 800, height: int = 600) -> Image.Image:
+    """A pair of gold hoop earrings on dark fabric: sold and worn as one set."""
+    from PIL import ImageDraw
+
+    image = Image.new("RGB", (width, height), (38, 36, 40))
+    draw = ImageDraw.Draw(image)
+    sx, sy = width / 800, height / 600
+    for cx in (320, 480):
+        draw.ellipse(
+            ((cx - 50) * sx, 250 * sy, (cx + 50) * sx, 350 * sy), outline=(214, 178, 92), width=round(14 * sx)
+        )
+    return image
+
+
+def care_label(width: int = 600, height: int = 400) -> Image.Image:
+    """A white care label with dark printed lines (no real text or brand)."""
+    from PIL import ImageDraw
+
+    image = Image.new("RGB", (width, height), (40, 40, 44))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((100, 60, 500, 340), fill=(248, 248, 244))
+    for row in range(6):
+        y = 90 + row * 40
+        draw.rectangle((130, y, 470 - (row % 3) * 60, y + 12), fill=(30, 30, 30))
+    return image

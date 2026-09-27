@@ -60,6 +60,8 @@ if (tables > 0) {
 await sql`drop schema if exists public`;
 await sql`create schema if not exists extensions`;
 await sql`create extension if not exists pgcrypto with schema extensions`;
+// pgvector (P1.02) stores item embeddings; the dump references its type.
+await sql`create extension if not exists vector with schema extensions`;
 const container = process.env.PG_TOOLS_CONTAINER;
 const restore = container
   ? spawnSync('docker', ['exec', '-i', container, 'pg_restore', '-U', 'supabase_admin', '-d', new URL(target).pathname.slice(1), '--exit-on-error'], {

@@ -33,13 +33,35 @@
             "content_type"
           ],
           "additionalProperties": false
+        },
+        "outputs": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "content_type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "url",
+              "content_type"
+            ],
+            "additionalProperties": false
+          }
         }
       },
       "required": [
         "status",
         "lease_expires_at",
-        "capability",
-        "output"
+        "capability"
       ],
       "additionalProperties": false
     },
